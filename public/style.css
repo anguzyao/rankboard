@@ -78,15 +78,13 @@ button:disabled {
   margin-bottom: 16px;
 }
 
-.eyebrow {
-  margin: 0 0 5px;
+.site-logo {
+  display: block;
 
-  color: #39ff84;
+  width: 105px;
+  height: auto;
 
-  font-size: 11px;
-  font-weight: 900;
-
-  letter-spacing: 0.22em;
+  margin: 0 0 7px;
 }
 
 h1 {
