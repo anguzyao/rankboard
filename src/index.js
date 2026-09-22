@@ -3,7 +3,17 @@ const SESSION_MINUTES = 30;
 
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
+   const url = new URL(request.url);
+
+if (url.pathname === "/api/debug-password") {
+  const secret = String(env.ADMIN_PASSWORD || "");
+
+  return Response.json({
+    exists: secret.length > 0,
+    length: secret.length,
+    trimmedLength: secret.trim().length
+  });
+}
 
     // =========================
     // 公開排名
