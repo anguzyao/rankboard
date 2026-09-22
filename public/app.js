@@ -28,8 +28,7 @@ async function loadRanking() {
       throw new Error();
     }
 
-    const data =
-      await response.json();
+    const data = await response.json();
 
     renderRanking(
       data.participants || []
@@ -58,9 +57,7 @@ async function loadRanking() {
 // =========================
 // 公開排名
 // =========================
-function renderRanking(
-  participants
-) {
+function renderRanking(participants) {
   if (!participants.length) {
     rankingList.innerHTML = `
       <div class="empty-state">
@@ -70,75 +67,68 @@ function renderRanking(
     return;
   }
 
-  const sorted =
-    [...participants].sort(
-      (a, b) =>
-        Number(a.rank) -
-        Number(b.rank)
-    );
+  const sorted = [...participants].sort(
+    (a, b) =>
+      Number(a.rank) - Number(b.rank)
+  );
 
-  rankingList.innerHTML =
-    sorted
-      .map((participant) => {
-        const rank =
-          Number(participant.rank);
+  rankingList.innerHTML = sorted
+    .map((participant) => {
+      const rank =
+        Number(participant.rank);
 
-        const previousRank =
-          participant.previousRank;
+      const previousRank =
+        participant.previousRank;
 
-        let changeHtml = "";
+      let changeHtml = "";
 
+      if (
+        previousRank !== null &&
+        previousRank !== undefined
+      ) {
         if (
-          previousRank !== null &&
-          previousRank !== undefined
+          Number(previousRank) > rank
         ) {
-          if (
-            Number(previousRank) >
-            rank
-          ) {
-            changeHtml = `
-              <span class="rank-change up">
-                ↑
-              </span>
-            `;
-          } else if (
-            Number(previousRank) <
-            rank
-          ) {
-            changeHtml = `
-              <span class="rank-change down">
-                ↓
-              </span>
-            `;
-          } else {
-            changeHtml = `
-              <span class="rank-change same">
-                —
-              </span>
-            `;
-          }
+          changeHtml = `
+            <span class="rank-change up">
+              ↑
+            </span>
+          `;
+        } else if (
+          Number(previousRank) < rank
+        ) {
+          changeHtml = `
+            <span class="rank-change down">
+              ↓
+            </span>
+          `;
+        } else {
+          changeHtml = `
+            <span class="rank-change same">
+              —
+            </span>
+          `;
         }
+      }
 
-        return `
-          <article class="rank-card ${getTopClass(rank)}">
-            <div class="rank-number">
-              ${rank}
-            </div>
+      return `
+        <article class="rank-card ${getTopClass(rank)}">
+          <div class="rank-number">
+            ${rank}
+          </div>
 
-            <div class="participant-name">
-              ${escapeHtml(
-                participant.name
-              )}
-              ${changeHtml}
-            </div>
+          <div class="participant-name">
+            ${escapeHtml(participant.name)}
+            ${changeHtml}
+          </div>
 
-            <div class="participant-score">
-              ${Number(participant.score) || 0}
-            </div>
-          </article>
-        `;
-      })
-      .join("");
+          <div class="participant-score">
+            ${Number(participant.score) || 0}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 
@@ -159,33 +149,28 @@ async function adminLogin() {
   }
 
   if (!password) {
-    alert("請輸入密碼");
     return;
   }
 
   try {
     const response =
-      await fetch(
-        "/api/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-          body: JSON.stringify({
-            password
-          })
-        }
-      );
+      await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/json"
+        },
+        body: JSON.stringify({
+          password
+        })
+      });
 
     const data =
       await response.json();
 
     if (!response.ok) {
       alert(
-        data.error ||
-        "登入失敗"
+        data.error || "登入失敗"
       );
       return;
     }
@@ -203,6 +188,7 @@ async function adminLogin() {
 
     await loadRanking();
     await loadLogs();
+
   } catch {
     alert("目前無法登入");
   }
@@ -221,7 +207,7 @@ async function logoutAdmin() {
       }
     );
   } catch {
-    // 不阻止前端鎖定
+    // 即使 API 失敗，也讓前端鎖定
   }
 
   isAdmin = false;
@@ -338,9 +324,7 @@ function showAdminPanel() {
   `;
 
   document
-    .getElementById(
-      "logoutButton"
-    )
+    .getElementById("logoutButton")
     .addEventListener(
       "click",
       logoutAdmin
@@ -356,18 +340,14 @@ function showAdminPanel() {
     );
 
   document
-    .getElementById(
-      "undoButton"
-    )
+    .getElementById("undoButton")
     .addEventListener(
       "click",
       undoLastScore
     );
 
   document
-    .getElementById(
-      "logsButton"
-    )
+    .getElementById("logsButton")
     .addEventListener(
       "click",
       toggleLogs
@@ -390,12 +370,10 @@ function renderAdminParticipants(
     return;
   }
 
-  const sorted =
-    [...participants].sort(
-      (a, b) =>
-        Number(a.rank) -
-        Number(b.rank)
-    );
+  const sorted = [...participants].sort(
+    (a, b) =>
+      Number(a.rank) - Number(b.rank)
+  );
 
   container.innerHTML =
     sorted
@@ -405,91 +383,70 @@ function renderAdminParticipants(
             class="admin-participant"
             data-id="${participant.id}"
           >
-            <div class="admin-participant-top">
-              <span class="admin-rank">
-                #${participant.rank}
-              </span>
 
-              <button
-                class="delete-button"
-                data-action="delete"
-                data-id="${participant.id}"
-              >
-                刪除
-              </button>
+            <div class="admin-rank">
+              #${participant.rank}
             </div>
 
-            <div class="admin-name-row">
-              <input
-                class="name-edit-input"
-                value="${escapeHtml(
-                  participant.name
-                )}"
-                maxlength="50"
-              >
+            <input
+              class="name-edit-input"
+              value="${escapeHtml(
+                participant.name
+              )}"
+              maxlength="50"
+            >
 
-              <button
-                class="secondary-button save-name-button"
-                data-action="save-name"
-                data-id="${participant.id}"
-              >
-                儲存
-              </button>
-            </div>
+            <button
+              class="score-button minus"
+              data-action="score"
+              data-delta="-1"
+              data-id="${participant.id}"
+            >
+              −1
+            </button>
 
-            <div class="score-control">
-              <button
-                class="score-button minus"
-                data-action="score"
-                data-delta="-5"
-                data-id="${participant.id}"
-              >
-                -5
-              </button>
+            <input
+              class="score-input"
+              type="number"
+              min="0"
+              step="1"
+              value="${Number(
+                participant.score
+              )}"
+              data-id="${participant.id}"
+            >
 
-              <button
-                class="score-button minus"
-                data-action="score"
-                data-delta="-1"
-                data-id="${participant.id}"
-              >
-                -1
-              </button>
+            <button
+              class="score-button plus"
+              data-action="score"
+              data-delta="1"
+              data-id="${participant.id}"
+            >
+              +1
+            </button>
 
-              <input
-                class="score-input"
-                type="number"
-                min="0"
-                step="1"
-                value="${Number(
-                  participant.score
-                )}"
-                data-id="${participant.id}"
-              >
+            <button
+              class="secondary-button save-name-button"
+              data-action="save-name"
+              data-id="${participant.id}"
+            >
+              儲存
+            </button>
 
-              <button
-                class="score-button plus"
-                data-action="score"
-                data-delta="1"
-                data-id="${participant.id}"
-              >
-                +1
-              </button>
+            <button
+              class="delete-button"
+              data-action="delete"
+              data-id="${participant.id}"
+            >
+              刪除
+            </button>
 
-              <button
-                class="score-button plus"
-                data-action="score"
-                data-delta="5"
-                data-id="${participant.id}"
-              >
-                +5
-              </button>
-            </div>
           </div>
         `
       )
       .join("");
 
+  // +1 / -1
   container
     .querySelectorAll(
       "[data-action='score']"
@@ -508,6 +465,7 @@ function renderAdminParticipants(
       );
     });
 
+  // 儲存姓名
   container
     .querySelectorAll(
       "[data-action='save-name']"
@@ -523,6 +481,7 @@ function renderAdminParticipants(
       );
     });
 
+  // 刪除
   container
     .querySelectorAll(
       "[data-action='delete']"
@@ -538,6 +497,7 @@ function renderAdminParticipants(
       );
     });
 
+  // 直接輸入分數
   container
     .querySelectorAll(
       ".score-input"
@@ -557,8 +517,7 @@ function renderAdminParticipants(
         "keydown",
         (event) => {
           if (
-            event.key ===
-            "Enter"
+            event.key === "Enter"
           ) {
             input.blur();
           }
@@ -569,7 +528,7 @@ function renderAdminParticipants(
 
 
 // =========================
-// 新增
+// 新增參賽者
 // =========================
 async function addParticipant() {
   const input =
@@ -616,6 +575,7 @@ async function addParticipant() {
     resetAutoLockTimer();
 
     await loadRanking();
+
   } catch {
     alert("目前無法新增參賽者");
   }
@@ -623,7 +583,7 @@ async function addParticipant() {
 
 
 // =========================
-// 加減分
+// +1 / -1
 // =========================
 async function updateScore(
   id,
@@ -659,6 +619,7 @@ async function updateScore(
     resetAutoLockTimer();
 
     await loadRanking();
+
   } catch {
     alert("目前無法更新分數");
   }
@@ -706,6 +667,7 @@ async function setScore(
     resetAutoLockTimer();
 
     await loadRanking();
+
   } catch {
     alert("目前無法更新分數");
   }
@@ -767,6 +729,7 @@ async function saveName(id) {
     resetAutoLockTimer();
 
     await loadRanking();
+
   } catch {
     alert("目前無法修改姓名");
   }
@@ -774,11 +737,9 @@ async function saveName(id) {
 
 
 // =========================
-// 刪除
+// 刪除參賽者
 // =========================
-async function deleteParticipant(
-  id
-) {
+async function deleteParticipant(id) {
   const row =
     document.querySelector(
       `.admin-participant[data-id="${id}"]`
@@ -825,6 +786,7 @@ async function deleteParticipant(
     resetAutoLockTimer();
 
     await loadRanking();
+
   } catch {
     alert("目前無法刪除參賽者");
   }
@@ -859,6 +821,7 @@ async function undoLastScore() {
 
     await loadRanking();
     await loadLogs();
+
   } catch {
     alert("目前無法復原");
   }
@@ -926,6 +889,7 @@ async function loadLogs() {
           `
         )
         .join("");
+
   } catch {
     panel.innerHTML = `
       <div class="logs-empty">
@@ -1012,7 +976,7 @@ function getLogText(log) {
 
 
 // =========================
-// 自動鎖定
+// 30分鐘自動鎖定
 // =========================
 function bindActivityEvents() {
   if (activityEventsBound) {
@@ -1121,26 +1085,11 @@ function formatTime(value) {
 
 function escapeHtml(value) {
   return String(value)
-    .replaceAll(
-      "&",
-      "&amp;"
-    )
-    .replaceAll(
-      "<",
-      "&lt;"
-    )
-    .replaceAll(
-      ">",
-      "&gt;"
-    )
-    .replaceAll(
-      '"',
-      "&quot;"
-    )
-    .replaceAll(
-      "'",
-      "&#039;"
-    );
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 
