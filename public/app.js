@@ -1369,7 +1369,10 @@ function renderAdminParticipants() {
     selectedCompetition ===
     "total";
 
-  rankingParticipants.forEach(
+rankingParticipants
+  .slice()
+  .sort((a, b) => a.id - b.id)
+  .forEach(
     (participant) => {
       const row =
         document.createElement(
