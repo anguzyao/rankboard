@@ -243,7 +243,6 @@ async function addParticipant() {
 
     await loadRanking();
 
-    alert(`已新增參賽者：${name}`);
   } catch (error) {
     alert("目前無法新增參賽者");
   }
