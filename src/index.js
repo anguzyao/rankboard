@@ -25,6 +25,22 @@ export default {
       });
     }
 
+    if (url.pathname === "/api/login" && request.method === "POST") {
+      const body = await request.json();
+      const password = String(body.password || "");
+
+      if (password !== env.ADMIN_PASSWORD) {
+        return Response.json(
+          { error: "密碼錯誤" },
+          { status: 401 }
+        );
+      }
+
+      return Response.json({
+        success: true
+      });
+    }
+
     if (url.pathname.startsWith("/api/")) {
       return Response.json({
         status: "ok"
