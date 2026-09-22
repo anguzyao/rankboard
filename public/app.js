@@ -2,6 +2,8 @@ const rankingList = document.getElementById("rankingList");
 const updatedAt = document.getElementById("updatedAt");
 const adminButton = document.getElementById("adminButton");
 
+let isAdmin = false;
+
 async function loadRanking() {
   try {
     const response = await fetch("/api/state");
@@ -135,11 +137,115 @@ async function adminLogin() {
     const sessionData = await sessionResponse.json();
 
     if (sessionData.authenticated) {
-      alert("管理員登入成功");
+      isAdmin = true;
       adminButton.textContent = "🔓";
+
+      showAdminPanel();
+
+      alert("管理員登入成功");
     }
   } catch (error) {
     alert("目前無法登入");
+  }
+}
+
+function showAdminPanel() {
+  let panel = document.getElementById("adminPanel");
+
+  if (panel) {
+    return;
+  }
+
+  panel = document.createElement("section");
+  panel.id = "adminPanel";
+  panel.className = "status-card";
+
+  panel.innerHTML = `
+    <div style="display:block;">
+      <div style="margin-bottom:12px;">
+        <strong style="font-size:16px;">管理員模式</strong>
+      </div>
+
+      <div style="display:flex;gap:8px;">
+        <input
+          id="participantNameInput"
+          type="text"
+          placeholder="輸入參賽者姓名"
+          maxlength="50"
+          style="
+            flex:1;
+            min-width:0;
+            padding:12px;
+            border:1px solid #343a43;
+            border-radius:12px;
+            background:#0f1216;
+            color:#fff;
+          "
+        >
+
+        <button
+          id="addParticipantButton"
+          style="
+            padding:12px 16px;
+            border:1px solid #343a43;
+            border-radius:12px;
+            background:#20252c;
+            color:#fff;
+            cursor:pointer;
+            font-weight:700;
+          "
+        >
+          新增
+        </button>
+      </div>
+    </div>
+  `;
+
+  const statusCard = document.querySelector(".status-card");
+
+  statusCard.insertAdjacentElement("afterend", panel);
+
+  document
+    .getElementById("addParticipantButton")
+    .addEventListener("click", addParticipant);
+}
+
+async function addParticipant() {
+  const input =
+    document.getElementById("participantNameInput");
+
+  const name = input.value.trim();
+
+  if (!name) {
+    alert("請輸入參賽者姓名");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/participants", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        name
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "新增失敗");
+      return;
+    }
+
+    input.value = "";
+
+    await loadRanking();
+
+    alert(`已新增參賽者：${name}`);
+  } catch (error) {
+    alert("目前無法新增參賽者");
   }
 }
 
