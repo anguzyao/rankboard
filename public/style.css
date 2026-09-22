@@ -1172,21 +1172,44 @@ h1 {
 }
 
 .rank-card.top-1::before {
-  content: "👑";
+  content: "";
 
   position: absolute;
 
-  top: -18px;
+  top: -19px;
   left: 33px;
+
+  width: 30px;
+  height: 23px;
 
   transform: translateX(-50%);
 
-  font-size: 24px;
-  line-height: 1;
+  clip-path: polygon(
+    0% 12%,
+    18% 38%,
+    30% 0%,
+    50% 31%,
+    70% 0%,
+    82% 38%,
+    100% 12%,
+    88% 100%,
+    12% 100%
+  );
+
+  background:
+    linear-gradient(
+      145deg,
+      #fff9cf 0%,
+      #ffe45c 20%,
+      #ffb300 48%,
+      #d87500 72%,
+      #fff0a0 100%
+    );
 
   filter:
-    drop-shadow(0 0 5px rgba(255, 180, 0, 0.9))
-    drop-shadow(0 0 12px rgba(255, 140, 0, 0.6));
+    drop-shadow(0 0 2px rgba(255, 235, 150, 1))
+    drop-shadow(0 0 6px rgba(255, 174, 0, 0.95))
+    drop-shadow(0 0 12px rgba(255, 120, 0, 0.45));
 
   z-index: 10;
 }
@@ -1208,22 +1231,44 @@ h1 {
 }
 
 .rank-card.top-2::before {
-  content: "👑";
+  content: "";
 
   position: absolute;
 
-  top: -17px;
+  top: -18px;
   left: 33px;
+
+  width: 28px;
+  height: 22px;
 
   transform: translateX(-50%);
 
-  font-size: 22px;
-  line-height: 1;
+  clip-path: polygon(
+    0% 12%,
+    18% 38%,
+    30% 0%,
+    50% 31%,
+    70% 0%,
+    82% 38%,
+    100% 12%,
+    88% 100%,
+    12% 100%
+  );
+
+  background:
+    linear-gradient(
+      145deg,
+      #ffffff 0%,
+      #edf3f7 20%,
+      #bcc8d1 45%,
+      #71808c 72%,
+      #f7fbff 100%
+    );
 
   filter:
-    grayscale(1)
-    brightness(1.7)
-    drop-shadow(0 0 7px rgba(220, 230, 240, 0.7));
+    drop-shadow(0 0 2px rgba(255, 255, 255, 1))
+    drop-shadow(0 0 6px rgba(205, 225, 240, 0.9))
+    drop-shadow(0 0 11px rgba(150, 190, 220, 0.4));
 
   z-index: 10;
 }
@@ -1245,24 +1290,44 @@ h1 {
 }
 
 .rank-card.top-3::before {
-  content: "👑";
+  content: "";
 
   position: absolute;
 
-  top: -17px;
+  top: -18px;
   left: 33px;
+
+  width: 28px;
+  height: 22px;
 
   transform: translateX(-50%);
 
-  font-size: 22px;
-  line-height: 1;
+  clip-path: polygon(
+    0% 12%,
+    18% 38%,
+    30% 0%,
+    50% 31%,
+    70% 0%,
+    82% 38%,
+    100% 12%,
+    88% 100%,
+    12% 100%
+  );
+
+  background:
+    linear-gradient(
+      145deg,
+      #ffd9b5 0%,
+      #efa86d 22%,
+      #c5743c 48%,
+      #87401f 72%,
+      #f4b47f 100%
+    );
 
   filter:
-    sepia(1)
-    saturate(2)
-    hue-rotate(330deg)
-    brightness(1.1)
-    drop-shadow(0 0 7px rgba(190, 110, 50, 0.7));
+    drop-shadow(0 0 2px rgba(255, 210, 170, 0.95))
+    drop-shadow(0 0 6px rgba(220, 125, 65, 0.8))
+    drop-shadow(0 0 11px rgba(180, 70, 30, 0.4));
 
   z-index: 10;
 }
