@@ -3,17 +3,7 @@ const SESSION_MINUTES = 30;
 
 export default {
   async fetch(request, env) {
-   const url = new URL(request.url);
-
-if (url.pathname === "/api/debug-password") {
-  const secret = String(env.ADMIN_PASSWORD || "");
-
-  return Response.json({
-    exists: secret.length > 0,
-    length: secret.length,
-    trimmedLength: secret.trim().length
-  });
-}
+    const url = new URL(request.url);
 
     // =========================
     // 公開排名
@@ -48,7 +38,10 @@ if (url.pathname === "/api/debug-password") {
       const body = await request.json();
       const password = String(body.password || "");
 
-      if (password.trim() !== String(env.ADMIN_PASSWORD || "").trim()) {
+      if (
+        password.trim() !==
+        String(env.ADMIN_PASSWORD || "").trim()
+      ) {
         return Response.json(
           { error: "密碼錯誤" },
           { status: 401 }
@@ -57,6 +50,7 @@ if (url.pathname === "/api/debug-password") {
 
       const token = crypto.randomUUID();
       const now = new Date();
+
       const expiresAt = new Date(
         now.getTime() + SESSION_MINUTES * 60 * 1000
       );
@@ -134,6 +128,112 @@ if (url.pathname === "/api/debug-password") {
     }
 
     // =========================
+    // 新增參賽者
+    // =========================
+    if (
+      url.pathname === "/api/participants" &&
+      request.method === "POST"
+    ) {
+      const session = await requireAdmin(request, env);
+
+      if (!session) {
+        return Response.json(
+          { error: "未登入管理員帳號" },
+          { status: 401 }
+        );
+      }
+
+      const body = await request.json();
+
+      const name = String(body.name || "").trim();
+
+      if (!name) {
+        return Response.json(
+          { error: "請輸入參賽者姓名" },
+          { status: 400 }
+        );
+      }
+
+      if (name.length > 50) {
+        return Response.json(
+          { error: "參賽者姓名最多 50 個字" },
+          { status: 400 }
+        );
+      }
+
+      const existing = await env.DB
+        .prepare(`
+          SELECT id
+          FROM participants
+          WHERE name = ?
+          LIMIT 1
+        `)
+        .bind(name)
+        .first();
+
+      if (existing) {
+        return Response.json(
+          { error: "參賽者已存在" },
+          { status: 409 }
+        );
+      }
+
+      const now = new Date().toISOString();
+
+      const insertResult = await env.DB
+        .prepare(`
+          INSERT INTO participants (
+            name,
+            score,
+            created_at,
+            updated_at
+          )
+          VALUES (?, 0, ?, ?)
+        `)
+        .bind(
+          name,
+          now,
+          now
+        )
+        .run();
+
+      const participantId = insertResult.meta.last_row_id;
+
+      await env.DB
+        .prepare(`
+          INSERT INTO operation_logs (
+            action,
+            participant_id,
+            old_score,
+            new_score,
+            created_at
+          )
+          VALUES (?, ?, ?, ?, ?)
+        `)
+        .bind(
+          "CREATE_PARTICIPANT",
+          participantId,
+          null,
+          0,
+          now
+        )
+        .run();
+
+      await refreshSession(session.token, env);
+
+      return Response.json({
+        success: true,
+        participant: {
+          id: participantId,
+          name,
+          score: 0,
+          created_at: now,
+          updated_at: now
+        }
+      });
+    }
+
+    // =========================
     // 其他 API
     // =========================
     if (url.pathname.startsWith("/api/")) {
@@ -151,12 +251,14 @@ if (url.pathname === "/api/debug-password") {
 // 讀取 Cookie
 // =========================
 function getCookie(request, name) {
-  const cookieHeader = request.headers.get("Cookie") || "";
+  const cookieHeader =
+    request.headers.get("Cookie") || "";
 
   const cookies = cookieHeader.split(";");
 
   for (const cookie of cookies) {
-    const [key, ...valueParts] = cookie.trim().split("=");
+    const [key, ...valueParts] =
+      cookie.trim().split("=");
 
     if (key === name) {
       return valueParts.join("=");
@@ -171,7 +273,10 @@ function getCookie(request, name) {
 // 取得有效 Session
 // =========================
 async function getSession(request, env) {
-  const token = getCookie(request, SESSION_COOKIE);
+  const token = getCookie(
+    request,
+    SESSION_COOKIE
+  );
 
   if (!token) {
     return null;
@@ -190,7 +295,8 @@ async function getSession(request, env) {
     return null;
   }
 
-  const expiresAt = new Date(session.expires_at);
+  const expiresAt =
+    new Date(session.expires_at);
 
   if (expiresAt.getTime() <= Date.now()) {
     await env.DB
@@ -209,11 +315,27 @@ async function getSession(request, env) {
 
 
 // =========================
+// 管理員驗證
+// =========================
+async function requireAdmin(request, env) {
+  const session =
+    await getSession(request, env);
+
+  if (!session) {
+    return null;
+  }
+
+  return session;
+}
+
+
+// =========================
 // 延長 Session
 // =========================
 async function refreshSession(token, env) {
   const expiresAt = new Date(
-    Date.now() + SESSION_MINUTES * 60 * 1000
+    Date.now() +
+    SESSION_MINUTES * 60 * 1000
   );
 
   await env.DB
