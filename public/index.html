@@ -1,39 +1,111 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
   <title>Beyblade X 排名</title>
-  <link rel="stylesheet" href="/style.css">
+
+  <link
+    rel="stylesheet"
+    href="/style.css"
+  >
 </head>
 
 <body>
+
   <main class="app">
+
+    <!-- =========================
+         Header
+         ========================= -->
+
     <header class="header">
+
       <div>
-        <p class="eyebrow">BEYBLADE X</p>
-        <h1>比賽排名</h1>
+
+        <p class="eyebrow">
+          BEYBLADE X
+        </p>
+
+        <h1 id="siteTitle">
+          比賽排名
+        </h1>
+
       </div>
 
-      <button id="adminButton" class="icon-button" aria-label="管理員登入">
+      <button
+        id="adminButton"
+        class="icon-button"
+        aria-label="管理員登入"
+      >
         🔒
       </button>
+
     </header>
 
-    <section class="status-card">
-      <div>
-        <span class="status-label">目前排名</span>
-        <strong id="updatedAt">尚未更新</strong>
-      </div>
+
+    <!-- =========================
+         競賽切換
+         ========================= -->
+
+    <section
+      id="competitionTabs"
+      class="competition-tabs"
+    >
     </section>
 
-    <section id="rankingList" class="ranking-list">
-      <div class="empty-state">
-        <p>目前尚無參賽者</p>
+
+    <!-- =========================
+         排名狀態
+         ========================= -->
+
+    <section class="status-card">
+
+      <div>
+
+        <span class="status-label">
+          目前排名
+        </span>
+
+        <strong id="updatedAt">
+          尚未更新
+        </strong>
+
       </div>
+
     </section>
+
+
+    <!-- =========================
+         公開排名
+         ========================= -->
+
+    <section
+      id="rankingList"
+      class="ranking-list"
+    >
+
+      <div class="empty-state">
+
+        <p>
+          目前尚無參賽者
+        </p>
+
+      </div>
+
+    </section>
+
   </main>
 
+
   <script src="/app.js"></script>
+
 </body>
+
 </html>
