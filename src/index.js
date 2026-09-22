@@ -776,7 +776,6 @@ export default {
           `)
           .bind(
             name,
-            0,
             now,
             now
           )
