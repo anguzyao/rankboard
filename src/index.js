@@ -38,7 +38,7 @@ export default {
       const body = await request.json();
       const password = String(body.password || "");
 
-      if (password !== env.ADMIN_PASSWORD) {
+      if (password.trim() !== String(env.ADMIN_PASSWORD || "").trim()) {
         return Response.json(
           { error: "密碼錯誤" },
           { status: 401 }
