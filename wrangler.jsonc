@@ -3,10 +3,16 @@
   "name": "rankboard",
   "main": "src/index.js",
   "compatibility_date": "2026-09-22",
+
+  "secrets": {
+    "required": ["ADMIN_PASSWORD"]
+  },
+
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
   },
+
   "d1_databases": [
     {
       "binding": "DB",
