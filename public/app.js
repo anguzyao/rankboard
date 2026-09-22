@@ -1,14 +1,22 @@
+const adminButton =
+  document.getElementById(
+    "adminButton"
+  );
+
 const rankingList =
-  document.getElementById("rankingList");
+  document.getElementById(
+    "rankingList"
+  );
 
 const updatedAt =
-  document.getElementById("updatedAt");
-
-const adminButton =
-  document.getElementById("adminButton");
+  document.getElementById(
+    "updatedAt"
+  );
 
 const siteTitle =
-  document.getElementById("siteTitle");
+  document.getElementById(
+    "siteTitle"
+  );
 
 const competitionTabs =
   document.getElementById(
@@ -16,29 +24,31 @@ const competitionTabs =
   );
 
 let isAdmin = false;
-let autoLockTimer = null;
-let activityEventsBound = false;
-
 let competitions = [];
 let selectedCompetition = "total";
 
+let rankingParticipants = [];
+let previousRanking = {};
 
-// =========================
+let autoLockTimer = null;
+const AUTO_LOCK_MINUTES = 30;
+
+
+// ============================================================
 // 初始化
-// =========================
+// ============================================================
 
 async function init() {
   await loadSiteSettings();
   await loadCompetitions();
+  await checkAdmin();
   await loadRanking();
 }
 
-init();
 
-
-// =========================
+// ============================================================
 // 網站設定
-// =========================
+// ============================================================
 
 async function loadSiteSettings() {
   try {
@@ -50,33 +60,28 @@ async function loadSiteSettings() {
         }
       );
 
-    if (!response.ok) {
-      return;
-    }
-
     const data =
       await response.json();
 
-    const title =
-      data.settings?.site_title ||
-      "比賽排名";
-
-    siteTitle.textContent =
-      title;
-
-    document.title =
-      `Beyblade X｜${title}`;
-
-  } catch {
-    siteTitle.textContent =
-      "比賽排名";
+    if (
+      data.settings &&
+      data.settings.site_title
+    ) {
+      siteTitle.textContent =
+        data.settings.site_title;
+    }
+  } catch (error) {
+    console.error(
+      "載入網站設定失敗",
+      error
+    );
   }
 }
 
 
-// =========================
-// 競賽
-// =========================
+// ============================================================
+// 載入競賽
+// ============================================================
 
 async function loadCompetitions() {
   try {
@@ -88,23 +93,23 @@ async function loadCompetitions() {
         }
       );
 
-    if (!response.ok) {
-      throw new Error();
-    }
-
     const data =
       await response.json();
 
     competitions =
-      data.competitions || [];
+      Array.isArray(
+        data.competitions
+      )
+        ? data.competitions
+        : [];
 
     renderCompetitionTabs();
+  } catch (error) {
+    console.error(
+      "載入競賽失敗",
+      error
+    );
 
-    if (isAdmin) {
-      renderCompetitionManager();
-    }
-
-  } catch {
     competitions = [];
 
     renderCompetitionTabs();
@@ -112,124 +117,246 @@ async function loadCompetitions() {
 }
 
 
-// =========================
-// 競賽切換按鈕
-// =========================
+// ============================================================
+// 競賽切換
+// ============================================================
 
 function renderCompetitionTabs() {
-  if (!competitionTabs) {
-    return;
+  competitionTabs.innerHTML = "";
+
+  const totalButton =
+    document.createElement(
+      "button"
+    );
+
+  totalButton.className =
+    "competition-tab";
+
+  if (
+    selectedCompetition ===
+    "total"
+  ) {
+    totalButton.classList.add(
+      "active"
+    );
   }
 
-  let html = `
-    <button
-      class="competition-tab ${
-        selectedCompetition === "total"
-          ? "active"
-          : ""
-      }"
-      data-competition="total"
-    >
-      總積分
-    </button>
-  `;
+  totalButton.textContent =
+    "總積分";
 
-  html += competitions
-    .map(
-      (competition) => `
-        <button
-          class="competition-tab ${
-            selectedCompetition ===
-            String(competition.id)
-              ? "active"
-              : ""
-          }"
-          data-competition="${competition.id}"
-        >
-          ${escapeHtml(
-            competition.name
-          )}
-        </button>
-      `
-    )
-    .join("");
+  totalButton.addEventListener(
+    "click",
+    async () => {
+      if (
+        selectedCompetition ===
+        "total"
+      ) {
+        return;
+      }
 
-  competitionTabs.innerHTML =
-    html;
+      selectedCompetition =
+        "total";
 
-  competitionTabs
-    .querySelectorAll(
-      ".competition-tab"
-    )
-    .forEach((button) => {
+      renderCompetitionTabs();
+
+      await loadRanking();
+    }
+  );
+
+  competitionTabs.appendChild(
+    totalButton
+  );
+
+  competitions.forEach(
+    (competition) => {
+      const button =
+        document.createElement(
+          "button"
+        );
+
+      button.className =
+        "competition-tab";
+
+      if (
+        String(
+          selectedCompetition
+        ) ===
+        String(
+          competition.id
+        )
+      ) {
+        button.classList.add(
+          "active"
+        );
+      }
+
+      button.textContent =
+        competition.name;
+
       button.addEventListener(
         "click",
-        () => {
+        async () => {
+          if (
+            String(
+              selectedCompetition
+            ) ===
+            String(
+              competition.id
+            )
+          ) {
+            return;
+          }
+
           selectedCompetition =
-            button.dataset.competition;
+            String(
+              competition.id
+            );
 
           renderCompetitionTabs();
 
-          loadRanking();
+          await loadRanking();
         }
       );
-    });
+
+      competitionTabs.appendChild(
+        button
+      );
+    }
+  );
 }
 
 
-// =========================
+// ============================================================
+// 目前競賽名稱
+// ============================================================
+
+function getSelectedCompetitionName() {
+  if (
+    selectedCompetition ===
+    "total"
+  ) {
+    return "總積分";
+  }
+
+  const competition =
+    competitions.find(
+      (item) =>
+        String(item.id) ===
+        String(
+          selectedCompetition
+        )
+    );
+
+  return competition
+    ? competition.name
+    : "競賽";
+}
+
+
+// ============================================================
 // 載入排名
-// =========================
+// ============================================================
 
 async function loadRanking() {
   try {
+    let endpoint =
+      "/api/state";
+
+    if (
+      selectedCompetition !==
+      "total"
+    ) {
+      endpoint +=
+        `?competition=${encodeURIComponent(
+          selectedCompetition
+        )}`;
+    }
+
     const response =
       await fetch(
-        "/api/state",
+        endpoint,
         {
           cache: "no-store"
         }
       );
 
     if (!response.ok) {
-      throw new Error();
+      throw new Error(
+        "排名載入失敗"
+      );
     }
 
     const data =
       await response.json();
 
+    rankingParticipants =
+      Array.isArray(
+        data.participants
+      )
+        ? data.participants
+        : [];
+
     renderRanking(
-      data.participants || []
+      rankingParticipants
     );
 
     updatedAt.textContent =
       data.updatedAt
-        ? `更新於 ${formatTime(
+        ? formatDateTime(
             data.updatedAt
-          )}`
+          )
         : "尚未更新";
 
     if (isAdmin) {
-      renderAdminParticipants(
-        data.participants || []
-      );
+      await renderAdminPanel();
     }
+  } catch (error) {
+    console.error(
+      "載入排名失敗",
+      error
+    );
 
-  } catch {
     rankingList.innerHTML = `
       <div class="empty-state">
-        <p>
-          目前無法取得排名資料
-        </p>
+        <p>排名載入失敗</p>
       </div>
     `;
   }
 }
 
 
-// =========================
+// ============================================================
+// 排名變化
+// ============================================================
+
+function getPreviousRank(
+  participantId
+) {
+  return previousRanking[
+    participantId
+  ];
+}
+
+
+function buildCurrentRankingMap(
+  participants
+) {
+  const map = {};
+
+  participants.forEach(
+    (participant) => {
+      map[participant.id] =
+        participant.rank;
+    }
+  );
+
+  return map;
+}
+
+
+// ============================================================
 // 公開排名
-// =========================
+// ============================================================
 
 function renderRanking(
   participants
@@ -237,125 +364,138 @@ function renderRanking(
   if (!participants.length) {
     rankingList.innerHTML = `
       <div class="empty-state">
-        <p>
-          目前尚無參賽者
-        </p>
+        <p>目前尚無參賽者</p>
       </div>
     `;
 
     return;
   }
 
-  const sorted =
-    [...participants].sort(
-      (a, b) =>
-        Number(a.rank) -
-        Number(b.rank)
-    );
+  const oldRanking =
+    previousRanking;
 
-  rankingList.innerHTML =
-    sorted
-      .map((participant) => {
-        const rank =
-          Number(
-            participant.rank
-          );
+  rankingList.innerHTML = "";
 
-        const previousRank =
-          participant.previousRank;
+  participants.forEach(
+    (participant) => {
+      const card =
+        document.createElement(
+          "article"
+        );
 
-        let changeHtml = "";
+      card.className =
+        "rank-card";
 
+      if (
+        participant.rank <= 4
+      ) {
+        card.classList.add(
+          `top-${participant.rank}`
+        );
+      }
+
+      const oldRank =
+        oldRanking[
+          participant.id
+        ];
+
+      let changeHTML = "";
+
+      if (
+        oldRank !== undefined
+      ) {
         if (
-          previousRank !== null &&
-          previousRank !== undefined
+          participant.rank <
+          oldRank
         ) {
-          if (
-            Number(previousRank) >
-            rank
-          ) {
-            changeHtml = `
-              <span
-                class="rank-change up"
-              >
-                ↑
-              </span>
-            `;
-          } else if (
-            Number(previousRank) <
-            rank
-          ) {
-            changeHtml = `
-              <span
-                class="rank-change down"
-              >
-                ↓
-              </span>
-            `;
-          } else {
-            changeHtml = `
-              <span
-                class="rank-change same"
-              >
-                —
-              </span>
-            `;
-          }
+          changeHTML = `
+            <span class="rank-change up">
+              ↑
+            </span>
+          `;
+        } else if (
+          participant.rank >
+          oldRank
+        ) {
+          changeHTML = `
+            <span class="rank-change down">
+              ↓
+            </span>
+          `;
+        } else {
+          changeHTML = `
+            <span class="rank-change same">
+              —
+            </span>
+          `;
         }
+      }
 
-        return `
-          <article
-            class="rank-card
-              ${getTopClass(rank)}"
-          >
+      card.innerHTML = `
+        <div class="rank-number">
+          ${participant.rank}
+        </div>
 
-            <div class="rank-number">
-              ${rank}
-            </div>
+        <div class="participant-name">
+          ${escapeHTML(
+            participant.name
+          )}
+        </div>
 
-            <div class="participant-name">
-              ${escapeHtml(
-                participant.name
-              )}
+        <div class="participant-score">
+          ${Number(
+            participant.score
+          )}
+          ${changeHTML}
+        </div>
+      `;
 
-              ${changeHtml}
-            </div>
+      rankingList.appendChild(
+        card
+      );
+    }
+  );
 
-            <div class="participant-score">
-              ${
-                Number(
-                  participant.score
-                ) || 0
-              }
-            </div>
-
-          </article>
-        `;
-      })
-      .join("");
+  previousRanking =
+    buildCurrentRankingMap(
+      participants
+    );
 }
 
 
-// =========================
+// ============================================================
 // 管理員登入
-// =========================
+// ============================================================
 
-async function adminLogin() {
-  if (isAdmin) {
-    await logoutAdmin();
-    return;
+adminButton.addEventListener(
+  "click",
+  async () => {
+    if (isAdmin) {
+      logoutAdmin();
+    } else {
+      await loginAdmin();
+    }
   }
+);
 
+
+async function loginAdmin() {
   const password =
     prompt(
       "請輸入管理員密碼"
     );
 
-  if (password === null) {
+  if (
+    password === null
+  ) {
     return;
   }
 
   if (!password) {
+    alert(
+      "請輸入密碼"
+    );
+
     return;
   }
 
@@ -365,16 +505,13 @@ async function adminLogin() {
         "/api/login",
         {
           method: "POST",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              password
-            })
+          body: JSON.stringify({
+            password
+          })
         }
       );
 
@@ -384,7 +521,7 @@ async function adminLogin() {
     if (!response.ok) {
       alert(
         data.error ||
-        "登入失敗"
+          "登入失敗"
       );
 
       return;
@@ -395,28 +532,26 @@ async function adminLogin() {
     adminButton.textContent =
       "🔓";
 
-    showAdminPanel();
+    resetAutoLock();
 
-    bindActivityEvents();
+    await renderAdminPanel();
 
-    resetAutoLockTimer();
+  } catch (error) {
+    console.error(
+      "登入失敗",
+      error
+    );
 
-    await loadSiteSettings();
-    await loadCompetitions();
-    await loadRanking();
-    await loadLogs();
-
-  } catch {
     alert(
-      "目前無法登入"
+      "登入失敗"
     );
   }
 }
 
 
-// =========================
+// ============================================================
 // 登出
-// =========================
+// ============================================================
 
 async function logoutAdmin() {
   try {
@@ -426,60 +561,83 @@ async function logoutAdmin() {
         method: "POST"
       }
     );
-  } catch {
-    // 保持前端鎖定
+  } catch (error) {
+    console.error(
+      "登出失敗",
+      error
+    );
   }
 
   isAdmin = false;
 
+  clearTimeout(
+    autoLockTimer
+  );
+
   adminButton.textContent =
     "🔒";
 
-  clearAutoLockTimer();
+  removeAdminPanel();
 
-  const panel =
-    document.getElementById(
-      "adminPanel"
-    );
+  await loadRanking();
+}
 
-  if (panel) {
-    panel.remove();
+
+// ============================================================
+// 檢查登入狀態
+// ============================================================
+
+async function checkAdmin() {
+  try {
+    const response =
+      await fetch(
+        "/api/me",
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (response.ok) {
+      isAdmin = true;
+
+      adminButton.textContent =
+        "🔓";
+
+      resetAutoLock();
+
+      await renderAdminPanel();
+    }
+  } catch (error) {
+    isAdmin = false;
   }
 }
 
 
-// =========================
+// ============================================================
 // 管理員面板
-// =========================
+// ============================================================
 
-function showAdminPanel() {
-  let panel =
-    document.getElementById(
-      "adminPanel"
-    );
+async function renderAdminPanel() {
+  removeAdminPanel();
 
-  if (!panel) {
-    panel =
-      document.createElement(
-        "section"
-      );
-
-    panel.id =
-      "adminPanel";
-
-    panel.className =
-      "admin-panel";
-
-    const statusCard =
-      document.querySelector(
-        ".status-card"
-      );
-
-    statusCard.insertAdjacentElement(
-      "afterend",
-      panel
-    );
+  if (!isAdmin) {
+    return;
   }
+
+  const panel =
+    document.createElement(
+      "section"
+    );
+
+  panel.id =
+    "adminPanel";
+
+  panel.className =
+    "admin-panel";
+
+  const totalMode =
+    selectedCompetition ===
+    "total";
 
   panel.innerHTML = `
     <div class="admin-header">
@@ -490,7 +648,9 @@ function showAdminPanel() {
         </span>
 
         <strong>
-          管理員模式
+          ${escapeHTML(
+            getSelectedCompetitionName()
+          )}
         </strong>
       </div>
 
@@ -503,23 +663,20 @@ function showAdminPanel() {
 
     </div>
 
-
-    <!-- =====================
-         網站標題
-         ===================== -->
-
     <div class="admin-section">
 
       <div class="admin-section-title">
         網站標題
       </div>
 
-      <div class="admin-title-row">
-
+      <div class="admin-title-editor">
         <input
           id="siteTitleInput"
-          class="admin-title-input"
+          class="name-edit-input"
           type="text"
+          value="${escapeAttribute(
+            siteTitle.textContent
+          )}"
           maxlength="50"
         >
 
@@ -529,15 +686,9 @@ function showAdminPanel() {
         >
           儲存
         </button>
-
       </div>
 
     </div>
-
-
-    <!-- =====================
-         競賽管理
-         ===================== -->
 
     <div class="admin-section">
 
@@ -550,14 +701,14 @@ function showAdminPanel() {
         class="competition-manager"
       ></div>
 
-      <div class="add-competition-row">
+      <div class="competition-add-row">
 
         <input
-          id="competitionNameInput"
-          class="admin-title-input"
+          id="newCompetitionInput"
+          class="name-edit-input"
           type="text"
-          maxlength="50"
           placeholder="新增競賽名稱"
+          maxlength="50"
         >
 
         <button
@@ -571,23 +722,33 @@ function showAdminPanel() {
 
     </div>
 
-
-    <!-- =====================
-         參賽者
-         ===================== -->
-
     <div class="admin-section">
 
       <div class="admin-section-title">
-        參賽者
+        ${totalMode
+          ? "總積分"
+          : `${escapeHTML(
+              getSelectedCompetitionName()
+            )} 分數`}
       </div>
+
+      ${
+        totalMode
+          ? `
+            <div class="admin-info">
+              總積分為所有競賽分數加總。
+              請切換到個別競賽後調整分數。
+            </div>
+          `
+          : ""
+      }
 
       <div class="add-participant">
 
         <input
-          id="participantNameInput"
+          id="newParticipantInput"
           type="text"
-          placeholder="輸入參賽者姓名"
+          placeholder="新增參賽者"
           maxlength="50"
         >
 
@@ -600,44 +761,45 @@ function showAdminPanel() {
 
       </div>
 
+      <div
+        id="adminParticipants"
+        class="admin-participants"
+      ></div>
+
+      <div class="admin-actions">
+
+        <button
+          id="undoButton"
+          class="secondary-button"
+        >
+          Undo
+        </button>
+
+        <button
+          id="logsButton"
+          class="secondary-button"
+        >
+          操作紀錄
+        </button>
+
+      </div>
+
+      <div
+        id="logsPanel"
+        class="logs-panel hidden"
+      ></div>
+
     </div>
-
-
-    <!-- =====================
-         操作
-         ===================== -->
-
-    <div class="admin-actions">
-
-      <button
-        id="undoButton"
-        class="secondary-button"
-      >
-        ↩ Undo
-      </button>
-
-      <button
-        id="logsButton"
-        class="secondary-button"
-      >
-        操作紀錄
-      </button>
-
-    </div>
-
-
-    <div
-      id="adminParticipants"
-      class="admin-participants"
-    ></div>
-
-
-    <div
-      id="logsPanel"
-      class="logs-panel hidden"
-    ></div>
   `;
 
+  const statusCard =
+    document.querySelector(
+      ".status-card"
+    );
+
+  statusCard.before(
+    panel
+  );
 
   document
     .getElementById(
@@ -648,7 +810,6 @@ function showAdminPanel() {
       logoutAdmin
     );
 
-
   document
     .getElementById(
       "saveSiteTitleButton"
@@ -657,7 +818,6 @@ function showAdminPanel() {
       "click",
       saveSiteTitle
     );
-
 
   document
     .getElementById(
@@ -668,7 +828,6 @@ function showAdminPanel() {
       addCompetition
     );
 
-
   document
     .getElementById(
       "addParticipantButton"
@@ -678,16 +837,14 @@ function showAdminPanel() {
       addParticipant
     );
 
-
   document
     .getElementById(
       "undoButton"
     )
     .addEventListener(
       "click",
-      undoLastScore
+      undoLastOperation
     );
-
 
   document
     .getElementById(
@@ -698,122 +855,31 @@ function showAdminPanel() {
       toggleLogs
     );
 
-
-  document
-    .getElementById(
-      "siteTitleInput"
-    ).value =
-      siteTitle.textContent ||
-      "比賽排名";
-
-
   renderCompetitionManager();
 
-  renderAdminParticipants(
-    []
-  );
+  renderAdminParticipants();
 }
 
 
-// =========================
-// 管理競賽
-// =========================
+// ============================================================
+// 移除管理員面板
+// ============================================================
 
-function renderCompetitionManager() {
-  const container =
+function removeAdminPanel() {
+  const panel =
     document.getElementById(
-      "competitionManager"
+      "adminPanel"
     );
 
-  if (!container) {
-    return;
+  if (panel) {
+    panel.remove();
   }
-
-  if (!competitions.length) {
-    container.innerHTML = `
-      <div class="competition-empty">
-        尚未建立競賽
-      </div>
-    `;
-
-    return;
-  }
-
-  container.innerHTML =
-    competitions
-      .map(
-        (competition) => `
-          <div
-            class="competition-manager-row"
-            data-id="${competition.id}"
-          >
-
-            <input
-              class="competition-name-input"
-              value="${escapeHtml(
-                competition.name
-              )}"
-              maxlength="50"
-            >
-
-            <button
-              class="secondary-button
-                competition-save-button"
-              data-id="${competition.id}"
-            >
-              儲存
-            </button>
-
-            <button
-              class="delete-button
-                competition-delete-button"
-              data-id="${competition.id}"
-            >
-              刪除
-            </button>
-
-          </div>
-        `
-      )
-      .join("");
-
-
-  container
-    .querySelectorAll(
-      ".competition-save-button"
-    )
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          saveCompetition(
-            button.dataset.id
-          );
-        }
-      );
-    });
-
-
-  container
-    .querySelectorAll(
-      ".competition-delete-button"
-    )
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          deleteCompetition(
-            button.dataset.id
-          );
-        }
-      );
-    });
 }
 
 
-// =========================
-// 儲存網站標題
-// =========================
+// ============================================================
+// 網站標題
+// ============================================================
 
 async function saveSiteTitle() {
   const input =
@@ -821,10 +887,18 @@ async function saveSiteTitle() {
       "siteTitleInput"
     );
 
+  if (!input) {
+    return;
+  }
+
   const title =
     input.value.trim();
 
   if (!title) {
+    alert(
+      "標題不能為空白"
+    );
+
     return;
   }
 
@@ -834,16 +908,13 @@ async function saveSiteTitle() {
         "/api/settings",
         {
           method: "PATCH",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              title
-            })
+          body: JSON.stringify({
+            title
+          })
         }
       );
 
@@ -853,7 +924,7 @@ async function saveSiteTitle() {
     if (!response.ok) {
       alert(
         data.error ||
-        "標題儲存失敗"
+          "儲存失敗"
       );
 
       return;
@@ -862,33 +933,147 @@ async function saveSiteTitle() {
     siteTitle.textContent =
       title;
 
-    document.title =
-      `Beyblade X｜${title}`;
-
-    resetAutoLockTimer();
-
-  } catch {
     alert(
-      "目前無法修改網站標題"
+      "網站標題已更新"
+    );
+
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
+    alert(
+      "儲存失敗"
     );
   }
 }
 
 
-// =========================
+// ============================================================
+// 競賽管理
+// ============================================================
+
+function renderCompetitionManager() {
+  const manager =
+    document.getElementById(
+      "competitionManager"
+    );
+
+  if (!manager) {
+    return;
+  }
+
+  manager.innerHTML = "";
+
+  if (!competitions.length) {
+    manager.innerHTML = `
+      <div class="admin-info">
+        目前尚未建立競賽。
+      </div>
+    `;
+
+    return;
+  }
+
+  competitions.forEach(
+    (competition) => {
+      const row =
+        document.createElement(
+          "div"
+        );
+
+      row.className =
+        "competition-manager-row";
+
+      row.innerHTML = `
+        <input
+          class="name-edit-input competition-name-input"
+          type="text"
+          value="${escapeAttribute(
+            competition.name
+          )}"
+          maxlength="50"
+        >
+
+        <button
+          class="secondary-button competition-save-button"
+        >
+          儲存
+        </button>
+
+        <button
+          class="delete-button competition-delete-button"
+        >
+          刪除
+        </button>
+      `;
+
+      const input =
+        row.querySelector(
+          ".competition-name-input"
+        );
+
+      const saveButton =
+        row.querySelector(
+          ".competition-save-button"
+        );
+
+      const deleteButton =
+        row.querySelector(
+          ".competition-delete-button"
+        );
+
+      saveButton.addEventListener(
+        "click",
+        async () => {
+          await renameCompetition(
+            competition.id,
+            input.value
+          );
+        }
+      );
+
+      deleteButton.addEventListener(
+        "click",
+        async () => {
+          await deleteCompetition(
+            competition.id
+          );
+        }
+      );
+
+      manager.appendChild(
+        row
+      );
+    }
+  );
+}
+
+
+// ============================================================
 // 新增競賽
-// =========================
+// ============================================================
 
 async function addCompetition() {
   const input =
     document.getElementById(
-      "competitionNameInput"
+      "newCompetitionInput"
     );
+
+  if (!input) {
+    return;
+  }
 
   const name =
     input.value.trim();
 
   if (!name) {
+    alert(
+      "請輸入競賽名稱"
+    );
+
     return;
   }
 
@@ -898,16 +1083,13 @@ async function addCompetition() {
         "/api/competitions",
         {
           method: "POST",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              name
-            })
+          body: JSON.stringify({
+            name
+          })
         }
       );
 
@@ -917,7 +1099,7 @@ async function addCompetition() {
     if (!response.ok) {
       alert(
         data.error ||
-        "新增競賽失敗"
+          "新增競賽失敗"
       );
 
       return;
@@ -925,62 +1107,56 @@ async function addCompetition() {
 
     input.value = "";
 
-    resetAutoLockTimer();
-
     await loadCompetitions();
 
-  } catch {
+    await loadRanking();
+
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法新增競賽"
+      "新增競賽失敗"
     );
   }
 }
 
 
-// =========================
-// 修改競賽名稱
-// =========================
+// ============================================================
+// 修改競賽
+// ============================================================
 
-async function saveCompetition(
-  id
+async function renameCompetition(
+  competitionId,
+  name
 ) {
-  const row =
-    document.querySelector(
-      `.competition-manager-row[data-id="${id}"]`
+  const cleanName =
+    String(name).trim();
+
+  if (!cleanName) {
+    alert(
+      "競賽名稱不能為空白"
     );
 
-  if (!row) {
-    return;
-  }
-
-  const input =
-    row.querySelector(
-      ".competition-name-input"
-    );
-
-  const name =
-    input.value.trim();
-
-  if (!name) {
     return;
   }
 
   try {
     const response =
       await fetch(
-        `/api/competitions/${id}`,
+        `/api/competitions/${competitionId}`,
         {
           method: "PATCH",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              name
-            })
+          body: JSON.stringify({
+            name: cleanName
+          })
         }
       );
 
@@ -990,36 +1166,42 @@ async function saveCompetition(
     if (!response.ok) {
       alert(
         data.error ||
-        "競賽名稱更新失敗"
+          "修改競賽失敗"
       );
 
       return;
     }
 
-    resetAutoLockTimer();
-
     await loadCompetitions();
 
-  } catch {
+    await loadRanking();
+
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法修改競賽名稱"
+      "修改競賽失敗"
     );
   }
 }
 
 
-// =========================
+// ============================================================
 // 刪除競賽
-// =========================
+// ============================================================
 
 async function deleteCompetition(
-  id
+  competitionId
 ) {
   const competition =
     competitions.find(
       (item) =>
         String(item.id) ===
-        String(id)
+        String(competitionId)
     );
 
   if (!competition) {
@@ -1028,7 +1210,7 @@ async function deleteCompetition(
 
   const confirmed =
     confirm(
-      `確定要刪除「${competition.name}」嗎？`
+      `確定要刪除「${competition.name}」嗎？\n\n此競賽的所有分數也會一起刪除。`
     );
 
   if (!confirmed) {
@@ -1038,7 +1220,7 @@ async function deleteCompetition(
   try {
     const response =
       await fetch(
-        `/api/competitions/${id}`,
+        `/api/competitions/${competitionId}`,
         {
           method: "DELETE"
         }
@@ -1050,222 +1232,64 @@ async function deleteCompetition(
     if (!response.ok) {
       alert(
         data.error ||
-        "刪除競賽失敗"
+          "刪除競賽失敗"
       );
 
       return;
     }
 
     if (
-      selectedCompetition ===
-      String(id)
+      String(
+        selectedCompetition
+      ) ===
+      String(
+        competitionId
+      )
     ) {
       selectedCompetition =
         "total";
     }
 
-    resetAutoLockTimer();
-
     await loadCompetitions();
 
-  } catch {
+    await loadRanking();
+
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法刪除競賽"
+      "刪除競賽失敗"
     );
   }
 }
 
 
-// =========================
-// 管理員參賽者
-// =========================
-
-function renderAdminParticipants(
-  participants
-) {
-  const container =
-    document.getElementById(
-      "adminParticipants"
-    );
-
-  if (!container) {
-    return;
-  }
-
-  const sorted =
-    [...participants].sort(
-      (a, b) =>
-        Number(a.rank) -
-        Number(b.rank)
-    );
-
-  container.innerHTML =
-    sorted
-      .map(
-        (participant) => `
-          <div
-            class="admin-participant"
-            data-id="${participant.id}"
-          >
-
-            <div class="admin-rank">
-              #${participant.rank}
-            </div>
-
-            <input
-              class="name-edit-input"
-              value="${escapeHtml(
-                participant.name
-              )}"
-              maxlength="50"
-            >
-
-            <button
-              class="score-button minus"
-              data-action="score"
-              data-delta="-1"
-              data-id="${participant.id}"
-            >
-              −1
-            </button>
-
-            <input
-              class="score-input"
-              type="number"
-              min="0"
-              step="1"
-              value="${Number(
-                participant.score
-              )}"
-              data-id="${participant.id}"
-            >
-
-            <button
-              class="score-button plus"
-              data-action="score"
-              data-delta="1"
-              data-id="${participant.id}"
-            >
-              +1
-            </button>
-
-            <button
-              class="secondary-button
-                save-name-button"
-              data-action="save-name"
-              data-id="${participant.id}"
-            >
-              儲存
-            </button>
-
-            <button
-              class="delete-button"
-              data-action="delete"
-              data-id="${participant.id}"
-            >
-              刪除
-            </button>
-
-          </div>
-        `
-      )
-      .join("");
-
-
-  container
-    .querySelectorAll(
-      "[data-action='score']"
-    )
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          updateScore(
-            button.dataset.id,
-            Number(
-              button.dataset.delta
-            )
-          );
-        }
-      );
-    });
-
-
-  container
-    .querySelectorAll(
-      "[data-action='save-name']"
-    )
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          saveName(
-            button.dataset.id
-          );
-        }
-      );
-    });
-
-
-  container
-    .querySelectorAll(
-      "[data-action='delete']"
-    )
-    .forEach((button) => {
-      button.addEventListener(
-        "click",
-        () => {
-          deleteParticipant(
-            button.dataset.id
-          );
-        }
-      );
-    });
-
-
-  container
-    .querySelectorAll(
-      ".score-input"
-    )
-    .forEach((input) => {
-      input.addEventListener(
-        "change",
-        () => {
-          setScore(
-            input.dataset.id,
-            Number(input.value)
-          );
-        }
-      );
-
-      input.addEventListener(
-        "keydown",
-        (event) => {
-          if (
-            event.key === "Enter"
-          ) {
-            input.blur();
-          }
-        }
-      );
-    });
-}
-
-
-// =========================
+// ============================================================
 // 新增參賽者
-// =========================
+// ============================================================
 
 async function addParticipant() {
   const input =
     document.getElementById(
-      "participantNameInput"
+      "newParticipantInput"
     );
+
+  if (!input) {
+    return;
+  }
 
   const name =
     input.value.trim();
 
   if (!name) {
+    alert(
+      "請輸入參賽者姓名"
+    );
+
     return;
   }
 
@@ -1275,16 +1299,13 @@ async function addParticipant() {
         "/api/participants",
         {
           method: "POST",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              name
-            })
+          body: JSON.stringify({
+            name
+          })
         }
       );
 
@@ -1294,7 +1315,7 @@ async function addParticipant() {
     if (!response.ok) {
       alert(
         data.error ||
-        "新增失敗"
+          "新增參賽者失敗"
       );
 
       return;
@@ -1302,42 +1323,236 @@ async function addParticipant() {
 
     input.value = "";
 
-    resetAutoLockTimer();
-
     await loadRanking();
 
-  } catch {
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法新增參賽者"
+      "新增參賽者失敗"
     );
   }
 }
 
 
-// =========================
-// 分數
-// =========================
+// ============================================================
+// 管理員參賽者列表
+// ============================================================
 
-async function updateScore(
-  id,
-  delta
+function renderAdminParticipants() {
+  const container =
+    document.getElementById(
+      "adminParticipants"
+    );
+
+  if (!container) {
+    return;
+  }
+
+  container.innerHTML = "";
+
+  if (!rankingParticipants.length) {
+    container.innerHTML = `
+      <div class="logs-empty">
+        目前尚無參賽者
+      </div>
+    `;
+
+    return;
+  }
+
+  const totalMode =
+    selectedCompetition ===
+    "total";
+
+  rankingParticipants.forEach(
+    (participant) => {
+      const row =
+        document.createElement(
+          "div"
+        );
+
+      row.className =
+        "admin-participant";
+
+      row.innerHTML = `
+        <div class="admin-rank">
+          ${participant.rank}
+        </div>
+
+        <input
+          class="name-edit-input"
+          type="text"
+          value="${escapeAttribute(
+            participant.name
+          )}"
+          maxlength="50"
+        >
+
+        <button
+          class="score-button minus"
+          ${totalMode ? "disabled" : ""}
+        >
+          −1
+        </button>
+
+        <input
+          class="score-input"
+          type="number"
+          min="0"
+          step="1"
+          value="${Number(
+            participant.score
+          )}"
+          ${totalMode ? "disabled" : ""}
+        >
+
+        <button
+          class="score-button plus"
+          ${totalMode ? "disabled" : ""}
+        >
+          +1
+        </button>
+
+        <button
+          class="secondary-button save-name-button"
+        >
+          儲存
+        </button>
+
+        <button
+          class="delete-button"
+        >
+          刪除
+        </button>
+      `;
+
+      const nameInput =
+        row.querySelector(
+          ".name-edit-input"
+        );
+
+      const scoreInput =
+        row.querySelector(
+          ".score-input"
+        );
+
+      const minusButton =
+        row.querySelector(
+          ".minus"
+        );
+
+      const plusButton =
+        row.querySelector(
+          ".plus"
+        );
+
+      const saveNameButton =
+        row.querySelector(
+          ".save-name-button"
+        );
+
+      const deleteButton =
+        row.querySelector(
+          ".delete-button"
+        );
+
+      saveNameButton.addEventListener(
+        "click",
+        async () => {
+          await saveParticipantName(
+            participant.id,
+            nameInput.value
+          );
+        }
+      );
+
+      deleteButton.addEventListener(
+        "click",
+        async () => {
+          await deleteParticipant(
+            participant.id,
+            participant.name
+          );
+        }
+      );
+
+      if (!totalMode) {
+        minusButton.addEventListener(
+          "click",
+          async () => {
+            await changeScore(
+              participant.id,
+              -1
+            );
+          }
+        );
+
+        plusButton.addEventListener(
+          "click",
+          async () => {
+            await changeScore(
+              participant.id,
+              1
+            );
+          }
+        );
+
+        scoreInput.addEventListener(
+          "change",
+          async () => {
+            await setScore(
+              participant.id,
+              scoreInput.value
+            );
+          }
+        );
+      }
+
+      container.appendChild(
+        row
+      );
+    }
+  );
+}
+
+
+// ============================================================
+// 修改姓名
+// ============================================================
+
+async function saveParticipantName(
+  participantId,
+  name
 ) {
+  const cleanName =
+    String(name).trim();
+
+  if (!cleanName) {
+    alert(
+      "姓名不能為空白"
+    );
+
+    return;
+  }
+
   try {
     const response =
       await fetch(
-        `/api/participants/${id}/score`,
+        `/api/participants/${participantId}`,
         {
           method: "PATCH",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              delta
-            })
+          body: JSON.stringify({
+            name: cleanName
+          })
         }
       );
 
@@ -1347,30 +1562,39 @@ async function updateScore(
     if (!response.ok) {
       alert(
         data.error ||
-        "分數更新失敗"
+          "修改姓名失敗"
       );
 
       return;
     }
 
-    resetAutoLockTimer();
-
     await loadRanking();
 
-  } catch {
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法更新分數"
+      "修改姓名失敗"
     );
   }
 }
 
 
-async function setScore(
-  id,
-  score
+// ============================================================
+// 分數 +1 / -1
+// ============================================================
+
+async function changeScore(
+  participantId,
+  delta
 ) {
   if (
-    !Number.isInteger(score)
+    selectedCompetition ===
+    "total"
   ) {
     return;
   }
@@ -1378,19 +1602,18 @@ async function setScore(
   try {
     const response =
       await fetch(
-        `/api/participants/${id}/score`,
+        `/api/participants/${participantId}/score?competition=${encodeURIComponent(
+          selectedCompetition
+        )}`,
         {
           method: "PATCH",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              score
-            })
+          body: JSON.stringify({
+            delta
+          })
         }
       );
 
@@ -1400,66 +1623,77 @@ async function setScore(
     if (!response.ok) {
       alert(
         data.error ||
-        "分數更新失敗"
+          "分數更新失敗"
       );
 
       return;
     }
 
-    resetAutoLockTimer();
-
     await loadRanking();
 
-  } catch {
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法更新分數"
+      "分數更新失敗"
     );
   }
 }
 
 
-// =========================
-// 修改參賽者姓名
-// =========================
+// ============================================================
+// 直接輸入分數
+// ============================================================
 
-async function saveName(id) {
-  const row =
-    document.querySelector(
-      `.admin-participant[data-id="${id}"]`
-    );
-
-  if (!row) {
+async function setScore(
+  participantId,
+  score
+) {
+  if (
+    selectedCompetition ===
+    "total"
+  ) {
     return;
   }
 
-  const input =
-    row.querySelector(
-      ".name-edit-input"
+  const numericScore =
+    Number(score);
+
+  if (
+    !Number.isInteger(
+      numericScore
+    ) ||
+    numericScore < 0
+  ) {
+    alert(
+      "分數必須是 0 以上的整數"
     );
 
-  const name =
-    input.value.trim();
+    await loadRanking();
 
-  if (!name) {
     return;
   }
 
   try {
     const response =
       await fetch(
-        `/api/participants/${id}`,
+        `/api/participants/${participantId}/score?competition=${encodeURIComponent(
+          selectedCompetition
+        )}`,
         {
           method: "PATCH",
-
           headers: {
             "Content-Type":
               "application/json"
           },
-
-          body:
-            JSON.stringify({
-              name
-            })
+          body: JSON.stringify({
+            score:
+              numericScore
+          })
         }
       );
 
@@ -1469,48 +1703,39 @@ async function saveName(id) {
     if (!response.ok) {
       alert(
         data.error ||
-        "姓名更新失敗"
+          "分數更新失敗"
       );
 
       return;
     }
 
-    resetAutoLockTimer();
-
     await loadRanking();
 
-  } catch {
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法修改姓名"
+      "分數更新失敗"
     );
   }
 }
 
 
-// =========================
+// ============================================================
 // 刪除參賽者
-// =========================
+// ============================================================
 
 async function deleteParticipant(
-  id
+  participantId,
+  participantName
 ) {
-  const row =
-    document.querySelector(
-      `.admin-participant[data-id="${id}"]`
-    );
-
-  if (!row) {
-    return;
-  }
-
-  const name =
-    row.querySelector(
-      ".name-edit-input"
-    )?.value || "";
-
   const confirmed =
     confirm(
-      `確定要刪除「${name}」嗎？`
+      `確定要刪除「${participantName}」嗎？\n\n他的所有競賽分數也會一起刪除。`
     );
 
   if (!confirmed) {
@@ -1520,7 +1745,7 @@ async function deleteParticipant(
   try {
     const response =
       await fetch(
-        `/api/participants/${id}`,
+        `/api/participants/${participantId}`,
         {
           method: "DELETE"
         }
@@ -1532,33 +1757,45 @@ async function deleteParticipant(
     if (!response.ok) {
       alert(
         data.error ||
-        "刪除失敗"
+          "刪除失敗"
       );
 
       return;
     }
 
-    resetAutoLockTimer();
-
     await loadRanking();
 
-  } catch {
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法刪除參賽者"
+      "刪除失敗"
     );
   }
 }
 
 
-// =========================
+// ============================================================
 // Undo
-// =========================
+// ============================================================
 
-async function undoLastScore() {
+async function undoLastOperation() {
+  const competitionQuery =
+    selectedCompetition !==
+    "total"
+      ? `?competition=${encodeURIComponent(
+          selectedCompetition
+        )}`
+      : "";
+
   try {
     const response =
       await fetch(
-        "/api/undo",
+        `/api/undo${competitionQuery}`,
         {
           method: "POST"
         }
@@ -1570,36 +1807,51 @@ async function undoLastScore() {
     if (!response.ok) {
       alert(
         data.error ||
-        "目前沒有可以復原的操作"
+          "目前沒有可以復原的操作"
       );
 
       return;
     }
 
-    resetAutoLockTimer();
-
     await loadRanking();
-    await loadLogs();
 
-  } catch {
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
     alert(
-      "目前無法復原"
+      "Undo 失敗"
     );
   }
 }
 
 
-// =========================
+// ============================================================
 // 操作紀錄
-// =========================
+// ============================================================
 
-async function loadLogs() {
+async function toggleLogs() {
   const panel =
     document.getElementById(
       "logsPanel"
     );
 
   if (!panel) {
+    return;
+  }
+
+  if (
+    !panel.classList.contains(
+      "hidden"
+    )
+  ) {
+    panel.classList.add(
+      "hidden"
+    );
+
     return;
   }
 
@@ -1612,247 +1864,256 @@ async function loadLogs() {
         }
       );
 
-    if (!response.ok) {
-      return;
-    }
-
     const data =
       await response.json();
 
-    const logs =
-      data.logs || [];
-
-    if (!logs.length) {
-      panel.innerHTML = `
-        <div class="logs-empty">
-          尚無操作紀錄
-        </div>
-      `;
+    if (!response.ok) {
+      alert(
+        data.error ||
+          "讀取紀錄失敗"
+      );
 
       return;
     }
 
-    panel.innerHTML =
-      logs
-        .map(
-          (log) => `
-            <div class="log-item">
-
-              <div class="log-main">
-                ${escapeHtml(
-                  getLogText(log)
-                )}
-              </div>
-
-              <div class="log-time">
-                ${formatTime(
-                  log.created_at
-                )}
-              </div>
-
-            </div>
-          `
-        )
-        .join("");
-
-  } catch {
-    panel.innerHTML = `
-      <div class="logs-empty">
-        無法取得操作紀錄
-      </div>
-    `;
-  }
-}
-
-
-function toggleLogs() {
-  const panel =
-    document.getElementById(
-      "logsPanel"
+    renderLogs(
+      panel,
+      data.logs || []
     );
 
-  if (!panel) {
-    return;
-  }
-
-  panel.classList.toggle(
-    "hidden"
-  );
-
-  if (
-    !panel.classList.contains(
+    panel.classList.remove(
       "hidden"
-    )
-  ) {
-    loadLogs();
+    );
+
+    resetAutoLock();
+
+  } catch (error) {
+    console.error(
+      error
+    );
+
+    alert(
+      "讀取紀錄失敗"
+    );
   }
 }
 
 
-function getLogText(log) {
-  const name =
-    log.name ||
-    `參賽者 #${log.participant_id}`;
+function renderLogs(
+  panel,
+  logs
+) {
+  if (!logs.length) {
+    panel.innerHTML = `
+      <div class="logs-empty">
+        目前沒有操作紀錄
+      </div>
+    `;
 
-  if (
-    log.action ===
-    "CREATE_PARTICIPANT"
-  ) {
-    return `新增參賽者：${name}`;
-  }
-
-  if (
-    log.action ===
-    "DELETE_PARTICIPANT"
-  ) {
-    return `刪除參賽者：${name}`;
-  }
-
-  if (
-    log.action ===
-    "EDIT_NAME"
-  ) {
-    return `修改姓名：${name}`;
-  }
-
-  if (
-    log.action ===
-    "SET_SCORE"
-  ) {
-    return `修改分數：${name} ${log.old_score} → ${log.new_score}`;
-  }
-
-  if (
-    log.action ===
-    "ADJUST_SCORE"
-  ) {
-    return `調整分數：${name} ${log.old_score} → ${log.new_score}`;
-  }
-
-  if (
-    String(log.action)
-      .startsWith("UNDO:")
-  ) {
-    return `復原分數：${name} ${log.old_score} → ${log.new_score}`;
-  }
-
-  return log.action;
-}
-
-
-// =========================
-// 自動鎖定
-// =========================
-
-function bindActivityEvents() {
-  if (activityEventsBound) {
     return;
   }
 
-  activityEventsBound = true;
+  panel.innerHTML = "";
 
-  [
-    "click",
-    "keydown",
-    "touchstart",
-    "mousemove"
-  ].forEach(
-    (eventName) => {
-      document.addEventListener(
-        eventName,
-        () => {
-          if (isAdmin) {
-            resetAutoLockTimer();
-          }
-        },
-        {
-          passive: true
-        }
+  logs.forEach(
+    (log) => {
+      const item =
+        document.createElement(
+          "div"
+        );
+
+      item.className =
+        "log-item";
+
+      item.innerHTML = `
+        <div class="log-main">
+          ${escapeHTML(
+            formatLogAction(log)
+          )}
+        </div>
+
+        <div class="log-time">
+          ${formatDateTime(
+            log.created_at
+          )}
+        </div>
+      `;
+
+      panel.appendChild(
+        item
       );
     }
   );
 }
 
 
-function resetAutoLockTimer() {
-  clearAutoLockTimer();
+// ============================================================
+// Log 顯示
+// ============================================================
 
+function formatLogAction(
+  log
+) {
+  const name =
+    log.name ||
+    "已刪除參賽者";
+
+  const action =
+    String(
+      log.action || ""
+    );
+
+  if (
+    action.startsWith(
+      "COMPETITION_ADJUST_SCORE:"
+    )
+  ) {
+    const competitionId =
+      action.split(":")[1];
+
+    const competition =
+      competitions.find(
+        (item) =>
+          String(item.id) ===
+          String(
+            competitionId
+          )
+      );
+
+    return `${name}｜${competition?.name || "競賽"}｜${log.old_score} → ${log.new_score}`;
+  }
+
+  if (
+    action.startsWith(
+      "COMPETITION_SET_SCORE:"
+    )
+  ) {
+    const competitionId =
+      action.split(":")[1];
+
+    const competition =
+      competitions.find(
+        (item) =>
+          String(item.id) ===
+          String(
+            competitionId
+          )
+      );
+
+    return `${name}｜${competition?.name || "競賽"}｜${log.old_score} → ${log.new_score}`;
+  }
+
+  if (
+    action.startsWith(
+      "COMPETITION_UNDO:"
+    )
+  ) {
+    return `${name}｜競賽分數 Undo`;
+  }
+
+  if (
+    action ===
+    "CREATE_PARTICIPANT"
+  ) {
+    return `新增參賽者：${name}`;
+  }
+
+  if (
+    action ===
+    "EDIT_NAME"
+  ) {
+    return `修改姓名：${name}`;
+  }
+
+  if (
+    action ===
+    "DELETE_PARTICIPANT"
+  ) {
+    return `刪除參賽者：${name}`;
+  }
+
+  if (
+    action ===
+    "ADJUST_SCORE"
+  ) {
+    return `${name}｜${log.old_score} → ${log.new_score}`;
+  }
+
+  if (
+    action ===
+    "SET_SCORE"
+  ) {
+    return `${name}｜${log.old_score} → ${log.new_score}`;
+  }
+
+  if (
+    action.startsWith(
+      "UNDO:"
+    )
+  ) {
+    return `${name}｜分數 Undo`;
+  }
+
+  return action;
+}
+
+
+// ============================================================
+// 30 分鐘自動鎖定
+// ============================================================
+
+function resetAutoLock() {
   if (!isAdmin) {
     return;
   }
 
+  clearTimeout(
+    autoLockTimer
+  );
+
   autoLockTimer =
     setTimeout(
       async () => {
-        await logoutAdmin();
+        if (isAdmin) {
+          await logoutAdmin();
+        }
       },
-      30 * 60 * 1000
+      AUTO_LOCK_MINUTES *
+        60 *
+        1000
     );
 }
 
 
-function clearAutoLockTimer() {
-  if (autoLockTimer) {
-    clearTimeout(
-      autoLockTimer
+[
+  "click",
+  "keydown",
+  "mousemove",
+  "touchstart"
+].forEach(
+  (eventName) => {
+    document.addEventListener(
+      eventName,
+      () => {
+        if (isAdmin) {
+          resetAutoLock();
+        }
+      },
+      {
+        passive: true
+      }
     );
-
-    autoLockTimer = null;
   }
-}
+);
 
 
-// =========================
+// ============================================================
 // 工具
-// =========================
+// ============================================================
 
-function getTopClass(rank) {
-  if (rank === 1) {
-    return "top-1";
-  }
-
-  if (rank === 2) {
-    return "top-2";
-  }
-
-  if (rank === 3) {
-    return "top-3";
-  }
-
-  if (rank === 4) {
-    return "top-4";
-  }
-
-  return "";
-}
-
-
-function formatTime(value) {
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return value;
-  }
-
-  return date.toLocaleString(
-    "zh-TW",
-    {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit"
-    }
-  );
-}
-
-
-function escapeHtml(value) {
+function escapeHTML(
+  value
+) {
   return String(value)
     .replaceAll(
       "&",
@@ -1877,7 +2138,44 @@ function escapeHtml(value) {
 }
 
 
-adminButton.addEventListener(
-  "click",
-  adminLogin
-);
+function escapeAttribute(
+  value
+) {
+  return escapeHTML(value);
+}
+
+
+function formatDateTime(
+  value
+) {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "尚未更新";
+  }
+
+  return date.toLocaleString(
+    "zh-TW",
+    {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false
+    }
+  );
+}
+
+
+// ============================================================
+// 啟動
+// ============================================================
+
+init();
