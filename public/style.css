@@ -3,19 +3,33 @@
 }
 
 html {
-  background: #0b0d10;
+  background: #07090a;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+
   background:
     radial-gradient(
-      circle at top,
-      #1b2027 0%,
-      #0b0d10 42%
+      circle at 50% -10%,
+      rgba(255, 107, 31, 0.10),
+      transparent 32%
+    ),
+    radial-gradient(
+      circle at 0% 35%,
+      rgba(57, 255, 132, 0.06),
+      transparent 30%
+    ),
+    linear-gradient(
+      180deg,
+      #111416 0%,
+      #080a0b 45%,
+      #050607 100%
     );
-  color: #f5f5f5;
+
+  color: #f5f7f8;
+
   font-family:
     -apple-system,
     BlinkMacSystemFont,
@@ -33,88 +47,261 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+
+/* =========================================================
+   APP
+   ========================================================= */
+
 .app {
   width: min(100%, 520px);
   min-height: 100vh;
+
   margin: 0 auto;
   padding: 22px 16px 40px;
 }
+
+
+/* =========================================================
+   HEADER
+   ========================================================= */
 
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
+
+  margin-bottom: 16px;
 }
 
 .eyebrow {
   margin: 0 0 5px;
-  color: #8d96a3;
+
+  color: #39ff84;
+
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
+  font-weight: 900;
+
+  letter-spacing: 0.22em;
 }
 
 h1 {
   margin: 0;
+
+  color: #ffffff;
+
   font-size: 28px;
   line-height: 1.2;
+
   letter-spacing: -0.03em;
 }
 
 .icon-button {
   width: 42px;
   height: 42px;
-  border: 1px solid #343a43;
+
+  border: 1px solid #353b3f;
   border-radius: 12px;
-  background: #171b20;
-  color: #d7dce2;
+
+  background: #15191b;
+
+  color: #dce2e5;
+
   cursor: pointer;
+
+  box-shadow:
+    inset 0 0 0 1px
+    rgba(255,255,255,0.02);
 }
 
+.icon-button:hover {
+  border-color: #39ff84;
+
+  color: #39ff84;
+
+  box-shadow:
+    0 0 14px
+    rgba(57,255,132,0.12);
+}
+
+
+/* =========================================================
+   COMPETITION TABS
+   ========================================================= */
+
+.competition-tabs {
+  display: flex;
+
+  gap: 7px;
+
+  margin-bottom: 14px;
+  padding: 4px;
+
+  overflow-x: auto;
+
+  border: 1px solid #292f32;
+  border-radius: 14px;
+
+  background:
+    linear-gradient(
+      180deg,
+      #15191b,
+      #0d1011
+    );
+
+  scrollbar-width: none;
+
+  box-shadow:
+    inset 0 0 18px
+    rgba(0,0,0,0.35);
+}
+
+.competition-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.competition-tab {
+  flex: 0 0 auto;
+
+  min-height: 38px;
+
+  padding: 0 15px;
+
+  border: 1px solid transparent;
+  border-radius: 10px;
+
+  background: transparent;
+
+  color: #727b80;
+
+  font-size: 13px;
+  font-weight: 900;
+
+  white-space: nowrap;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.competition-tab:hover {
+  color: #d9e0e3;
+}
+
+.competition-tab.active {
+  border-color: #39ff84;
+
+  background:
+    linear-gradient(
+      180deg,
+      rgba(57,255,132,0.15),
+      rgba(57,255,132,0.05)
+    );
+
+  color: #39ff84;
+
+  box-shadow:
+    0 0 14px
+    rgba(57,255,132,0.10),
+    inset 0 0 12px
+    rgba(57,255,132,0.05);
+}
+
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
 .status-card {
+  position: relative;
+
   margin-bottom: 16px;
   padding: 15px 16px;
-  border: 1px solid #292f37;
+
+  border: 1px solid #292f32;
   border-radius: 16px;
-  background: rgba(
-    23,
-    27,
-    32,
-    0.9
-  );
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(22,27,29,0.96),
+      rgba(12,15,16,0.96)
+    );
+
+  overflow: hidden;
+}
+
+.status-card::before {
+  content: "";
+
+  position: absolute;
+
+  left: 0;
+  top: 0;
+  bottom: 0;
+
+  width: 3px;
+
+  background: #39ff84;
+
+  box-shadow:
+    0 0 12px
+    rgba(57,255,132,0.55);
 }
 
 .status-card > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
+
   gap: 12px;
 }
 
 .status-label {
-  color: #8d96a3;
+  color: #737d82;
+
   font-size: 13px;
 }
 
 #updatedAt {
-  color: #dce1e7;
+  color: #cbd2d5;
+
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
 }
+
+
+/* =========================================================
+   RANKING
+   ========================================================= */
 
 .ranking-list {
   display: flex;
   flex-direction: column;
+
   gap: 10px;
 }
 
 .empty-state {
   padding: 50px 20px;
-  border: 1px dashed #343a43;
+
+  border: 1px dashed #343a3e;
   border-radius: 18px;
+
   text-align: center;
-  color: #8d96a3;
+
+  color: #737d82;
+
+  background:
+    rgba(10,12,13,0.75);
 }
 
 .empty-state p {
@@ -122,234 +309,571 @@ h1 {
 }
 
 
-/* =========================
-   公開排名
-   ========================= */
+/* =========================================================
+   RANK CARD
+   ========================================================= */
 
 .rank-card {
+  position: relative;
+
   display: grid;
+
   grid-template-columns:
-    48px minmax(0, 1fr) auto;
+    48px
+    minmax(0, 1fr)
+    auto;
+
   align-items: center;
+
   gap: 12px;
+
   min-height: 72px;
+
   padding: 12px 14px;
-  border: 1px solid #292f37;
+
+  border: 1px solid #292f32;
   border-radius: 16px;
-  background: #15191e;
+
+  background:
+    linear-gradient(
+      135deg,
+      #171b1d,
+      #101314
+    );
+
+  overflow: hidden;
+
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.rank-card::after {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  right: 0;
+
+  width: 90px;
+  height: 1px;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent,
+      rgba(255,255,255,0.16)
+    );
 }
 
 .rank-card.top-1 {
   border-color:
-    rgba(230, 190, 80, 0.65);
+    rgba(
+      255,
+      107,
+      31,
+      0.75
+    );
+
   box-shadow:
-    0 0 20px
-    rgba(230, 190, 80, 0.08);
+    0 0 22px
+    rgba(255,107,31,0.10);
 }
 
 .rank-card.top-2 {
   border-color:
-    rgba(190, 198, 207, 0.55);
+    rgba(
+      190,
+      200,
+      204,
+      0.45
+    );
 }
 
 .rank-card.top-3 {
   border-color:
-    rgba(181, 125, 76, 0.6);
+    rgba(
+      181,
+      125,
+      76,
+      0.55
+    );
 }
 
 .rank-card.top-4 {
   border-color:
-    rgba(120, 140, 160, 0.35);
+    rgba(
+      57,
+      255,
+      132,
+      0.22
+    );
 }
+
+
+/* =========================================================
+   RANK NUMBER
+   ========================================================= */
 
 .rank-number {
   display: flex;
+
   align-items: center;
   justify-content: center;
+
   width: 40px;
   height: 40px;
-  border-radius: 12px;
-  background: #20252c;
-  color: #dce1e7;
+
+  border-radius: 11px;
+
+  background: #22282b;
+
+  color: #cdd4d7;
+
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .top-1 .rank-number {
-  background: #8a6b16;
-  color: #fff4c7;
+  background:
+    linear-gradient(
+      135deg,
+      #ff6b1f,
+      #c8440c
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 0 16px
+    rgba(255,107,31,0.25);
 }
 
 .top-2 .rank-number {
-  background: #59616c;
-  color: #f0f2f5;
+  background:
+    linear-gradient(
+      135deg,
+      #666f75,
+      #3f464b
+    );
+
+  color: #f5f7f8;
 }
 
 .top-3 .rank-number {
-  background: #754b2f;
+  background:
+    linear-gradient(
+      135deg,
+      #875535,
+      #5f3927
+    );
+
   color: #ffe3d0;
 }
 
 .top-4 .rank-number {
-  background: #313943;
-  color: #d9e0e8;
+  background:
+    linear-gradient(
+      135deg,
+      #253b30,
+      #18251f
+    );
+
+  color: #39ff84;
 }
+
+
+/* =========================================================
+   NAME / SCORE
+   ========================================================= */
 
 .participant-name {
   min-width: 0;
+
   overflow: hidden;
-  color: #f4f5f6;
+
+  color: #f0f3f4;
+
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
+
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .participant-score {
   color: #ffffff;
-  font-size: 20px;
-  font-weight: 800;
+
+  font-size: 21px;
+  font-weight: 900;
+
   text-align: right;
+
+  letter-spacing: 0.01em;
+}
+
+.top-1 .participant-score {
+  color: #ff8a4b;
+
+  text-shadow:
+    0 0 12px
+    rgba(255,107,31,0.28);
+}
+
+.top-4 .participant-score {
+  color: #39ff84;
 }
 
 .rank-change {
   margin-left: 7px;
+
   font-size: 13px;
   font-weight: 900;
 }
 
 .rank-change.up {
-  color: #ff5b5b;
+  color: #ff5a36;
+
+  text-shadow:
+    0 0 8px
+    rgba(255,90,54,0.35);
 }
 
 .rank-change.down {
-  color: #61c784;
+  color: #39ff84;
+
+  text-shadow:
+    0 0 8px
+    rgba(57,255,132,0.25);
 }
 
 .rank-change.same {
-  color: #747d88;
+  color: #687277;
 }
 
 
-/* =========================
-   管理員
-   ========================= */
+/* =========================================================
+   ADMIN PANEL
+   ========================================================= */
 
 .admin-panel {
   margin-bottom: 18px;
+
   padding: 14px;
-  border: 1px solid #343a43;
+
+  border: 1px solid #30373a;
   border-radius: 18px;
+
   background:
     linear-gradient(
       180deg,
-      rgba(27, 32, 39, 0.98),
-      rgba(18, 22, 27, 0.98)
+      rgba(25,30,32,0.98),
+      rgba(13,16,17,0.98)
     );
+
+  box-shadow:
+    0 12px 35px
+    rgba(0,0,0,0.25);
 }
 
 .admin-header {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
+
   gap: 12px;
-  margin-bottom: 12px;
+
+  margin-bottom: 14px;
 }
 
 .admin-header > div {
   display: flex;
   flex-direction: column;
+
   gap: 4px;
+
+  min-width: 0;
 }
 
 .admin-eyebrow {
-  color: #8d96a3;
+  color: #ff6b1f;
+
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.16em;
+  font-weight: 900;
+
+  letter-spacing: 0.18em;
 }
 
 .admin-header strong {
+  overflow: hidden;
+
+  color: #ffffff;
+
   font-size: 16px;
+
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.add-participant {
+.admin-section {
+  margin-top: 12px;
+  padding-top: 12px;
+
+  border-top: 1px solid #292f32;
+}
+
+.admin-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+
+  border-top: 0;
+}
+
+.admin-section-title {
+  margin-bottom: 8px;
+
+  color: #cfd6d9;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  letter-spacing: 0.02em;
+}
+
+.admin-info {
+  margin-bottom: 9px;
+  padding: 10px 11px;
+
+  border: 1px solid #30383a;
+  border-radius: 10px;
+
+  background: #101415;
+
+  color: #7c868a;
+
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+
+.admin-title-editor,
+.add-participant,
+.competition-add-row {
   display: grid;
+
   grid-template-columns:
-    minmax(0, 1fr) auto;
+    minmax(0, 1fr)
+    auto;
+
   gap: 8px;
 }
 
-.add-participant input {
+.add-participant input,
+.name-edit-input,
+.score-input {
   min-width: 0;
-  padding: 11px 12px;
-  border: 1px solid #343a43;
-  border-radius: 11px;
-  background: #0f1216;
+
+  border: 1px solid #353d40;
+  border-radius: 9px;
+
+  background: #0b0e0f;
+
   color: #ffffff;
+
   outline: none;
+
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.add-participant input {
+  padding: 11px 12px;
+}
+
+.name-edit-input {
+  width: 100%;
+  height: 38px;
+
+  padding: 7px 9px;
+
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.score-input {
+  width: 100%;
+  height: 38px;
+
+  padding: 5px;
+
+  text-align: center;
+
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .add-participant input:focus,
 .name-edit-input:focus,
 .score-input:focus {
-  border-color: #697381;
+  border-color: #39ff84;
+
+  box-shadow:
+    0 0 0 2px
+    rgba(57,255,132,0.08);
 }
+
+
+/* =========================================================
+   BUTTONS
+   ========================================================= */
 
 .primary-button,
 .secondary-button,
 .delete-button,
 .score-button {
-  border: 1px solid #343a43;
+  border: 1px solid #353d40;
   border-radius: 10px;
+
   cursor: pointer;
-  font-weight: 800;
+
+  font-weight: 900;
+
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .primary-button {
   padding: 0 16px;
-  background: #e7e9ec;
-  color: #111418;
+
+  border-color: #ff6b1f;
+
+  background:
+    linear-gradient(
+      135deg,
+      #ff6b1f,
+      #e64f0b
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 0 14px
+    rgba(255,107,31,0.12);
+}
+
+.primary-button:hover {
+  box-shadow:
+    0 0 20px
+    rgba(255,107,31,0.22);
 }
 
 .secondary-button {
   padding: 9px 12px;
-  background: #20252c;
-  color: #ffffff;
+
+  background: #1b2123;
+
+  color: #dfe5e7;
 }
 
-.admin-actions {
+.secondary-button:hover {
+  border-color: #39ff84;
+
+  color: #39ff84;
+
+  box-shadow:
+    0 0 12px
+    rgba(57,255,132,0.08);
+}
+
+.delete-button {
+  background: #281615;
+
+  color: #ff765c;
+
+  border-color: #50302b;
+}
+
+.delete-button:hover {
+  border-color: #ff6b1f;
+
+  color: #ff9a7d;
+}
+
+
+/* =========================================================
+   COMPETITION MANAGER
+   ========================================================= */
+
+.competition-manager {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  margin-bottom: 8px;
+}
+
+.competition-manager-row {
   display: grid;
+
   grid-template-columns:
-    1fr 1fr;
-  gap: 8px;
-  margin-top: 9px;
+    minmax(0, 1fr)
+    58px
+    48px;
+
+  align-items: center;
+
+  gap: 5px;
+
+  padding: 5px;
+
+  border: 1px solid #2e3638;
+  border-radius: 11px;
+
+  background: #101415;
+}
+
+.competition-name-input {
+  min-width: 0;
+}
+
+.competition-save-button,
+.competition-delete-button {
+  width: 100%;
+  height: 38px;
+
+  padding: 0;
+
+  font-size: 11px;
 }
 
 
-/* =========================
-   參賽者單列
-   ========================= */
+/* =========================================================
+   ADMIN PARTICIPANTS
+   ========================================================= */
 
 .admin-participants {
   display: flex;
   flex-direction: column;
+
   gap: 6px;
+
   margin-top: 12px;
 }
 
 .admin-participant {
   display: grid;
 
-  /*
-    排名
-    姓名
-    -1
-    分數
-    +1
-    儲存
-    刪除
-  */
   grid-template-columns:
     32px
     minmax(105px, 1fr)
@@ -360,105 +884,91 @@ h1 {
     48px;
 
   align-items: center;
+
   gap: 5px;
 
   min-height: 52px;
+
   padding: 6px 7px;
 
-  border: 1px solid #2f353e;
+  border: 1px solid #2d3538;
   border-radius: 13px;
 
-  background: #11151a;
+  background:
+    linear-gradient(
+      135deg,
+      #121718,
+      #0c0f10
+    );
 }
 
 .admin-rank {
-  color: #8d96a3;
+  color: #727c80;
+
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 900;
+
   text-align: center;
-}
-
-.name-edit-input {
-  width: 100%;
-  min-width: 0;
-  height: 38px;
-  padding: 7px 9px;
-
-  border: 1px solid #343a43;
-  border-radius: 9px;
-
-  background: #0f1216;
-  color: #ffffff;
-
-  outline: none;
-  font-size: 14px;
-  font-weight: 700;
 }
 
 .score-button {
   width: 100%;
   height: 38px;
+
   padding: 0;
 
-  background: #20252c;
+  background: #1b2224;
 }
 
 .score-button.minus {
-  color: #ff9a9a;
+  color: #ff765c;
 }
 
 .score-button.plus {
-  color: #86e1a4;
+  color: #39ff84;
 }
 
-.score-input {
-  width: 100%;
-  height: 38px;
-  min-width: 0;
+.score-button.minus:hover {
+  border-color: #ff6b1f;
 
-  padding: 5px;
+  background: #281916;
+}
 
-  border: 1px solid #343a43;
-  border-radius: 9px;
+.score-button.plus:hover {
+  border-color: #39ff84;
 
-  background: #0f1216;
-  color: #ffffff;
-
-  outline: none;
-
-  text-align: center;
-  font-size: 15px;
-  font-weight: 800;
+  background: #14261b;
 }
 
 .save-name-button {
   width: 100%;
   height: 38px;
+
   padding: 0;
 
   font-size: 12px;
 }
 
-.delete-button {
-  width: 100%;
-  height: 38px;
-  padding: 0;
+.admin-actions {
+  display: grid;
 
-  background: #291719;
-  color: #ff8585;
-  border-color: #513034;
+  grid-template-columns:
+    1fr 1fr;
 
-  font-size: 12px;
+  gap: 8px;
+
+  margin-top: 9px;
 }
 
 
-/* =========================
-   操作紀錄
-   ========================= */
+/* =========================================================
+   LOGS
+   ========================================================= */
 
 .logs-panel {
   margin-top: 12px;
-  border-top: 1px solid #2f353e;
+
+  border-top: 1px solid #2d3538;
 }
 
 .logs-panel.hidden {
@@ -467,32 +977,41 @@ h1 {
 
 .log-item {
   padding: 10px 0;
-  border-bottom: 1px solid #262c33;
+
+  border-bottom: 1px solid #252b2d;
 }
 
 .log-main {
-  color: #dfe4e9;
+  color: #dfe5e7;
+
   font-size: 13px;
   font-weight: 700;
+
+  line-height: 1.5;
 }
 
 .log-time {
   margin-top: 3px;
-  color: #747d88;
+
+  color: #687276;
+
   font-size: 11px;
 }
 
 .logs-empty {
   padding: 16px 0;
-  color: #747d88;
+
+  color: #687276;
+
   text-align: center;
+
   font-size: 13px;
 }
 
 
-/* =========================
-   手機版
-   ========================= */
+/* =========================================================
+   MOBILE
+   ========================================================= */
 
 @media (max-width: 520px) {
   .app {
@@ -515,6 +1034,7 @@ h1 {
       44px;
 
     gap: 4px;
+
     padding: 5px;
   }
 
@@ -534,9 +1054,33 @@ h1 {
   .delete-button {
     font-size: 11px;
   }
+
+  .competition-manager-row {
+    grid-template-columns:
+      minmax(0, 1fr)
+      54px
+      46px;
+  }
 }
 
+
+/* =========================================================
+   390px 以下
+   ========================================================= */
+
 @media (max-width: 390px) {
+  .app {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .competition-tab {
+    padding-left: 12px;
+    padding-right: 12px;
+
+    font-size: 12px;
+  }
+
   .admin-participant {
     grid-template-columns:
       24px
@@ -557,6 +1101,7 @@ h1 {
   .name-edit-input {
     padding-left: 6px;
     padding-right: 6px;
+
     font-size: 12px;
   }
 
@@ -573,7 +1118,26 @@ h1 {
   .delete-button {
     font-size: 10px;
   }
+
+  .competition-manager-row {
+    grid-template-columns:
+      minmax(0, 1fr)
+      50px
+      43px;
+
+    gap: 4px;
+  }
+
+  .competition-save-button,
+  .competition-delete-button {
+    font-size: 10px;
+  }
 }
+
+
+/* =========================================================
+   DESKTOP
+   ========================================================= */
 
 @media (min-width: 600px) {
   .app {
