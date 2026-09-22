@@ -8,87 +8,415 @@ export default {
     // =========================
     // 公開排名
     // =========================
-    if (url.pathname === "/api/state" && request.method === "GET") {
-      const participants = await getParticipants(env);
-      const ranking = buildRanking(participants);
+    if (
+      url.pathname === "/api/state" &&
+      request.method === "GET"
+    ) {
+      const participants =
+        await getParticipants(env);
 
-      const historyRows = await env.DB
-        .prepare(`
-          SELECT participant_id, rank, created_at
-          FROM ranking_history
-          ORDER BY id DESC
-        `)
-        .all();
-
-      const snapshots = [];
-
-      for (const row of historyRows.results || []) {
-        if (!snapshots.includes(row.created_at)) {
-          snapshots.push(row.created_at);
-        }
-
-        if (snapshots.length >= 2) {
-          break;
-        }
-      }
-
-      const latestSnapshot = snapshots[0] || null;
-      const previousSnapshot = snapshots[1] || null;
-
-      const latestRanks = {};
-      const previousRanks = {};
-
-      for (const row of historyRows.results || []) {
-        if (row.created_at === latestSnapshot) {
-          latestRanks[row.participant_id] = row.rank;
-        }
-
-        if (row.created_at === previousSnapshot) {
-          previousRanks[row.participant_id] = row.rank;
-        }
-      }
-
-      const result = ranking.map((participant) => {
-        const currentRank = participant.rank;
-
-        let previousRank = null;
-
-        if (previousSnapshot) {
-          previousRank = previousRanks[participant.id] ?? null;
-        } else {
-          previousRank = null;
-        }
-
-        return {
-          ...participant,
-          previousRank
-        };
-      });
-
-      const updatedAt = participants.length
-        ? participants.reduce((latest, participant) => {
-            return participant.updated_at > latest
-              ? participant.updated_at
-              : latest;
-          }, participants[0].updated_at)
-        : null;
+      const ranking =
+        buildRanking(participants);
 
       return jsonResponse({
-        participants: result,
-        updatedAt
+        participants: ranking,
+        updatedAt: getLatestUpdatedAt(
+          participants
+        )
+      });
+    }
+
+    // =========================
+    // 取得網站設定
+    // =========================
+    if (
+      url.pathname === "/api/settings" &&
+      request.method === "GET"
+    ) {
+      const settings =
+        await getSiteSettings(env);
+
+      return jsonResponse({
+        settings
+      });
+    }
+
+    // =========================
+    // 修改網站標題
+    // =========================
+    if (
+      url.pathname === "/api/settings" &&
+      request.method === "PATCH"
+    ) {
+      const session =
+        await requireAdmin(request, env);
+
+      if (!session) {
+        return jsonResponse(
+          { error: "未登入管理員帳號" },
+          401
+        );
+      }
+
+      const body =
+        await request.json();
+
+      const title =
+        String(body.title || "").trim();
+
+      if (!title) {
+        return jsonResponse(
+          { error: "標題不能為空白" },
+          400
+        );
+      }
+
+      if (title.length > 50) {
+        return jsonResponse(
+          { error: "標題最多 50 個字" },
+          400
+        );
+      }
+
+      const now =
+        new Date().toISOString();
+
+      await env.DB
+        .prepare(`
+          INSERT INTO site_settings (
+            key,
+            value,
+            updated_at
+          )
+          VALUES (?, ?, ?)
+          ON CONFLICT(key)
+          DO UPDATE SET
+            value = excluded.value,
+            updated_at = excluded.updated_at
+        `)
+        .bind(
+          "site_title",
+          title,
+          now
+        )
+        .run();
+
+      await refreshSession(
+        session.token,
+        env
+      );
+
+      return jsonResponse({
+        success: true,
+        title
+      });
+    }
+
+    // =========================
+    // 取得競賽列表
+    // =========================
+    if (
+      url.pathname === "/api/competitions" &&
+      request.method === "GET"
+    ) {
+      const competitions =
+        await getCompetitions(env);
+
+      return jsonResponse({
+        competitions
+      });
+    }
+
+    // =========================
+    // 新增競賽
+    // =========================
+    if (
+      url.pathname === "/api/competitions" &&
+      request.method === "POST"
+    ) {
+      const session =
+        await requireAdmin(request, env);
+
+      if (!session) {
+        return jsonResponse(
+          { error: "未登入管理員帳號" },
+          401
+        );
+      }
+
+      const body =
+        await request.json();
+
+      const name =
+        String(body.name || "").trim();
+
+      if (!name) {
+        return jsonResponse(
+          { error: "競賽名稱不能為空白" },
+          400
+        );
+      }
+
+      if (name.length > 50) {
+        return jsonResponse(
+          { error: "競賽名稱最多 50 個字" },
+          400
+        );
+      }
+
+      const existing =
+        await env.DB
+          .prepare(`
+            SELECT id
+            FROM competitions
+            WHERE name = ?
+            LIMIT 1
+          `)
+          .bind(name)
+          .first();
+
+      if (existing) {
+        return jsonResponse(
+          { error: "競賽名稱已存在" },
+          409
+        );
+      }
+
+      const latest =
+        await env.DB
+          .prepare(`
+            SELECT
+              sort_order
+            FROM competitions
+            ORDER BY sort_order DESC
+            LIMIT 1
+          `)
+          .first();
+
+      const sortOrder =
+        latest
+          ? Number(latest.sort_order) + 1
+          : 1;
+
+      const now =
+        new Date().toISOString();
+
+      const result =
+        await env.DB
+          .prepare(`
+            INSERT INTO competitions (
+              name,
+              sort_order,
+              created_at,
+              updated_at
+            )
+            VALUES (?, ?, ?, ?)
+          `)
+          .bind(
+            name,
+            sortOrder,
+            now,
+            now
+          )
+          .run();
+
+      await refreshSession(
+        session.token,
+        env
+      );
+
+      return jsonResponse({
+        success: true,
+        competition: {
+          id: result.meta.last_row_id,
+          name,
+          sort_order: sortOrder,
+          created_at: now,
+          updated_at: now
+        }
+      });
+    }
+
+    // =========================
+    // 修改競賽名稱
+    // =========================
+    if (
+      url.pathname.match(
+        /^\/api\/competitions\/\d+$/
+      ) &&
+      request.method === "PATCH"
+    ) {
+      const session =
+        await requireAdmin(request, env);
+
+      if (!session) {
+        return jsonResponse(
+          { error: "未登入管理員帳號" },
+          401
+        );
+      }
+
+      const competitionId =
+        Number(
+          url.pathname.split("/").pop()
+        );
+
+      const body =
+        await request.json();
+
+      const name =
+        String(body.name || "").trim();
+
+      if (!name) {
+        return jsonResponse(
+          { error: "競賽名稱不能為空白" },
+          400
+        );
+      }
+
+      const competition =
+        await env.DB
+          .prepare(`
+            SELECT *
+            FROM competitions
+            WHERE id = ?
+          `)
+          .bind(competitionId)
+          .first();
+
+      if (!competition) {
+        return jsonResponse(
+          { error: "找不到競賽" },
+          404
+        );
+      }
+
+      const duplicate =
+        await env.DB
+          .prepare(`
+            SELECT id
+            FROM competitions
+            WHERE name = ?
+            AND id != ?
+            LIMIT 1
+          `)
+          .bind(
+            name,
+            competitionId
+          )
+          .first();
+
+      if (duplicate) {
+        return jsonResponse(
+          { error: "競賽名稱已存在" },
+          409
+        );
+      }
+
+      const now =
+        new Date().toISOString();
+
+      await env.DB
+        .prepare(`
+          UPDATE competitions
+          SET name = ?,
+              updated_at = ?
+          WHERE id = ?
+        `)
+        .bind(
+          name,
+          now,
+          competitionId
+        )
+        .run();
+
+      await refreshSession(
+        session.token,
+        env
+      );
+
+      return jsonResponse({
+        success: true
+      });
+    }
+
+    // =========================
+    // 刪除競賽
+    // =========================
+    if (
+      url.pathname.match(
+        /^\/api\/competitions\/\d+$/
+      ) &&
+      request.method === "DELETE"
+    ) {
+      const session =
+        await requireAdmin(request, env);
+
+      if (!session) {
+        return jsonResponse(
+          { error: "未登入管理員帳號" },
+          401
+        );
+      }
+
+      const competitionId =
+        Number(
+          url.pathname.split("/").pop()
+        );
+
+      const competition =
+        await env.DB
+          .prepare(`
+            SELECT *
+            FROM competitions
+            WHERE id = ?
+          `)
+          .bind(competitionId)
+          .first();
+
+      if (!competition) {
+        return jsonResponse(
+          { error: "找不到競賽" },
+          404
+        );
+      }
+
+      await env.DB
+        .prepare(`
+          DELETE FROM competitions
+          WHERE id = ?
+        `)
+        .bind(competitionId)
+        .run();
+
+      await refreshSession(
+        session.token,
+        env
+      );
+
+      return jsonResponse({
+        success: true
       });
     }
 
     // =========================
     // 管理員登入
     // =========================
-    if (url.pathname === "/api/login" && request.method === "POST") {
-      const body = await request.json();
-      const password = String(body.password || "");
+    if (
+      url.pathname === "/api/login" &&
+      request.method === "POST"
+    ) {
+      const body =
+        await request.json();
+
+      const password =
+        String(body.password || "");
 
       if (
         password.trim() !==
-        String(env.ADMIN_PASSWORD || "").trim()
+        String(
+          env.ADMIN_PASSWORD || ""
+        ).trim()
       ) {
         return jsonResponse(
           { error: "密碼錯誤" },
@@ -96,11 +424,19 @@ export default {
         );
       }
 
-      const token = crypto.randomUUID();
-      const now = new Date();
-      const expiresAt = new Date(
-        now.getTime() + SESSION_MINUTES * 60 * 1000
-      );
+      const token =
+        crypto.randomUUID();
+
+      const now =
+        new Date();
+
+      const expiresAt =
+        new Date(
+          now.getTime() +
+          SESSION_MINUTES *
+            60 *
+            1000
+        );
 
       await env.DB
         .prepare(`
@@ -118,9 +454,10 @@ export default {
         )
         .run();
 
-      const response = jsonResponse({
-        success: true
-      });
+      const response =
+        jsonResponse({
+          success: true
+        });
 
       response.headers.set(
         "Set-Cookie",
@@ -133,11 +470,15 @@ export default {
     // =========================
     // 管理員登出
     // =========================
-    if (url.pathname === "/api/logout" && request.method === "POST") {
-      const token = getCookie(
-        request,
-        SESSION_COOKIE
-      );
+    if (
+      url.pathname === "/api/logout" &&
+      request.method === "POST"
+    ) {
+      const token =
+        getCookie(
+          request,
+          SESSION_COOKIE
+        );
 
       if (token) {
         await env.DB
@@ -149,9 +490,10 @@ export default {
           .run();
       }
 
-      const response = jsonResponse({
-        success: true
-      });
+      const response =
+        jsonResponse({
+          success: true
+        });
 
       response.headers.set(
         "Set-Cookie",
@@ -164,17 +506,29 @@ export default {
     // =========================
     // 登入狀態
     // =========================
-    if (url.pathname === "/api/me" && request.method === "GET") {
-      const session = await getSession(request, env);
+    if (
+      url.pathname === "/api/me" &&
+      request.method === "GET"
+    ) {
+      const session =
+        await getSession(
+          request,
+          env
+        );
 
       if (!session) {
         return jsonResponse(
-          { authenticated: false },
+          {
+            authenticated: false
+          },
           401
         );
       }
 
-      await refreshSession(session.token, env);
+      await refreshSession(
+        session.token,
+        env
+      );
 
       return jsonResponse({
         authenticated: true
@@ -182,637 +536,11 @@ export default {
     }
 
     // =========================
-    // 新增參賽者
-    // =========================
-    if (
-      url.pathname === "/api/participants" &&
-      request.method === "POST"
-    ) {
-      const session = await requireAdmin(
-        request,
-        env
-      );
-
-      if (!session) {
-        return jsonResponse(
-          { error: "未登入管理員帳號" },
-          401
-        );
-      }
-
-      const body = await request.json();
-      const name = String(body.name || "").trim();
-
-      if (!name) {
-        return jsonResponse(
-          { error: "請輸入參賽者姓名" },
-          400
-        );
-      }
-
-      if (name.length > 50) {
-        return jsonResponse(
-          { error: "參賽者姓名最多 50 個字" },
-          400
-        );
-      }
-
-      const existing = await env.DB
-        .prepare(`
-          SELECT id
-          FROM participants
-          WHERE name = ?
-          LIMIT 1
-        `)
-        .bind(name)
-        .first();
-
-      if (existing) {
-        return jsonResponse(
-          { error: "參賽者已存在" },
-          409
-        );
-      }
-
-      const now = await getNextTimestamp(env);
-
-      const insertResult = await env.DB
-        .prepare(`
-          INSERT INTO participants (
-            name,
-            score,
-            created_at,
-            updated_at
-          )
-          VALUES (?, 0, ?, ?)
-        `)
-        .bind(
-          name,
-          now,
-          now
-        )
-        .run();
-
-      const participantId =
-        insertResult.meta.last_row_id;
-
-      await env.DB
-        .prepare(`
-          INSERT INTO operation_logs (
-            action,
-            participant_id,
-            old_score,
-            new_score,
-            created_at
-          )
-          VALUES (?, ?, ?, ?, ?)
-        `)
-        .bind(
-          "CREATE_PARTICIPANT",
-          participantId,
-          null,
-          0,
-          now
-        )
-        .run();
-
-      await createRankingSnapshot(
-        env,
-        now
-      );
-
-      await refreshSession(
-        session.token,
-        env
-      );
-
-      return jsonResponse({
-        success: true
-      });
-    }
-
-    // =========================
-    // 修改參賽者姓名
-    // =========================
-    if (
-      url.pathname.match(/^\/api\/participants\/\d+$/) &&
-      request.method === "PATCH"
-    ) {
-      const session = await requireAdmin(
-        request,
-        env
-      );
-
-      if (!session) {
-        return jsonResponse(
-          { error: "未登入管理員帳號" },
-          401
-        );
-      }
-
-      const participantId = Number(
-        url.pathname.split("/").pop()
-      );
-
-      const body = await request.json();
-      const name = String(body.name || "").trim();
-
-      if (!name) {
-        return jsonResponse(
-          { error: "姓名不能為空白" },
-          400
-        );
-      }
-
-      const participant = await env.DB
-        .prepare(`
-          SELECT *
-          FROM participants
-          WHERE id = ?
-        `)
-        .bind(participantId)
-        .first();
-
-      if (!participant) {
-        return jsonResponse(
-          { error: "找不到參賽者" },
-          404
-        );
-      }
-
-      const duplicate = await env.DB
-        .prepare(`
-          SELECT id
-          FROM participants
-          WHERE name = ?
-          AND id != ?
-          LIMIT 1
-        `)
-        .bind(
-          name,
-          participantId
-        )
-        .first();
-
-      if (duplicate) {
-        return jsonResponse(
-          { error: "這個姓名已經存在" },
-          409
-        );
-      }
-
-      const now = await getNextTimestamp(env);
-
-      await env.DB
-        .prepare(`
-          UPDATE participants
-          SET name = ?,
-              updated_at = ?
-          WHERE id = ?
-        `)
-        .bind(
-          name,
-          now,
-          participantId
-        )
-        .run();
-
-      await env.DB
-        .prepare(`
-          INSERT INTO operation_logs (
-            action,
-            participant_id,
-            old_score,
-            new_score,
-            created_at
-          )
-          VALUES (?, ?, ?, ?, ?)
-        `)
-        .bind(
-          "EDIT_NAME",
-          participantId,
-          participant.score,
-          participant.score,
-          now
-        )
-        .run();
-
-      await refreshSession(
-        session.token,
-        env
-      );
-
-      return jsonResponse({
-        success: true
-      });
-    }
-
-    // =========================
-    // 修改分數
-    // =========================
-    if (
-      url.pathname.match(
-        /^\/api\/participants\/\d+\/score$/
-      ) &&
-      request.method === "PATCH"
-    ) {
-      const session = await requireAdmin(
-        request,
-        env
-      );
-
-      if (!session) {
-        return jsonResponse(
-          { error: "未登入管理員帳號" },
-          401
-        );
-      }
-
-      const participantId = Number(
-        url.pathname.split("/")[3]
-      );
-
-      const body = await request.json();
-
-      const participant = await env.DB
-        .prepare(`
-          SELECT *
-          FROM participants
-          WHERE id = ?
-        `)
-        .bind(participantId)
-        .first();
-
-      if (!participant) {
-        return jsonResponse(
-          { error: "找不到參賽者" },
-          404
-        );
-      }
-
-      let newScore;
-
-      if (body.delta !== undefined) {
-        const delta = Number(body.delta);
-
-        if (!Number.isInteger(delta)) {
-          return jsonResponse(
-            { error: "分數變更必須是整數" },
-            400
-          );
-        }
-
-        newScore = Math.max(
-          0,
-          Number(participant.score) + delta
-        );
-      } else {
-        newScore = Number(body.score);
-
-        if (!Number.isInteger(newScore)) {
-          return jsonResponse(
-            { error: "分數必須是整數" },
-            400
-          );
-        }
-
-        newScore = Math.max(
-          0,
-          newScore
-        );
-      }
-
-      const oldScore =
-        Number(participant.score);
-
-      if (newScore === oldScore) {
-        return jsonResponse({
-          success: true
-        });
-      }
-
-      const now = await getNextTimestamp(env);
-
-      const action =
-        body.delta !== undefined
-          ? "ADJUST_SCORE"
-          : "SET_SCORE";
-
-      await env.DB.batch([
-        env.DB
-          .prepare(`
-            UPDATE participants
-            SET score = ?,
-                updated_at = ?
-            WHERE id = ?
-          `)
-          .bind(
-            newScore,
-            now,
-            participantId
-          ),
-
-        env.DB
-          .prepare(`
-            INSERT INTO operation_logs (
-              action,
-              participant_id,
-              old_score,
-              new_score,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?)
-          `)
-          .bind(
-            action,
-            participantId,
-            oldScore,
-            newScore,
-            now
-          )
-      ]);
-
-      await createRankingSnapshot(
-        env,
-        now
-      );
-
-      await refreshSession(
-        session.token,
-        env
-      );
-
-      return jsonResponse({
-        success: true,
-        score: newScore
-      });
-    }
-
-    // =========================
-    // 刪除參賽者
-    // =========================
-    if (
-      url.pathname.match(
-        /^\/api\/participants\/\d+$/
-      ) &&
-      request.method === "DELETE"
-    ) {
-      const session = await requireAdmin(
-        request,
-        env
-      );
-
-      if (!session) {
-        return jsonResponse(
-          { error: "未登入管理員帳號" },
-          401
-        );
-      }
-
-      const participantId = Number(
-        url.pathname.split("/").pop()
-      );
-
-      const participant = await env.DB
-        .prepare(`
-          SELECT *
-          FROM participants
-          WHERE id = ?
-        `)
-        .bind(participantId)
-        .first();
-
-      if (!participant) {
-        return jsonResponse(
-          { error: "找不到參賽者" },
-          404
-        );
-      }
-
-      const now = await getNextTimestamp(env);
-
-      await env.DB.batch([
-        env.DB
-          .prepare(`
-            DELETE FROM participants
-            WHERE id = ?
-          `)
-          .bind(participantId),
-
-        env.DB
-          .prepare(`
-            INSERT INTO operation_logs (
-              action,
-              participant_id,
-              old_score,
-              new_score,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?)
-          `)
-          .bind(
-            "DELETE_PARTICIPANT",
-            participantId,
-            participant.score,
-            null,
-            now
-          )
-      ]);
-
-      await createRankingSnapshot(
-        env,
-        now
-      );
-
-      await refreshSession(
-        session.token,
-        env
-      );
-
-      return jsonResponse({
-        success: true
-      });
-    }
-
-    // =========================
-    // Undo
-    // =========================
-    if (
-      url.pathname === "/api/undo" &&
-      request.method === "POST"
-    ) {
-      const session = await requireAdmin(
-        request,
-        env
-      );
-
-      if (!session) {
-        return jsonResponse(
-          { error: "未登入管理員帳號" },
-          401
-        );
-      }
-
-      const lastUndo = await env.DB
-        .prepare(`
-          SELECT id
-          FROM operation_logs
-          WHERE action LIKE 'UNDO:%'
-          ORDER BY id DESC
-          LIMIT 1
-        `)
-        .first();
-
-      const undoBoundary =
-        lastUndo?.id || 0;
-
-      const lastOperation = await env.DB
-        .prepare(`
-          SELECT *
-          FROM operation_logs
-          WHERE action IN (
-            'SET_SCORE',
-            'ADJUST_SCORE'
-          )
-          AND id > ?
-          AND NOT EXISTS (
-            SELECT 1
-            FROM operation_logs u
-            WHERE u.action = 'UNDO:' || CAST(operation_logs.id AS TEXT)
-          )
-          ORDER BY id DESC
-          LIMIT 1
-        `)
-        .bind(undoBoundary)
-        .first();
-
-      if (!lastOperation) {
-        return jsonResponse(
-          { error: "目前沒有可以復原的操作" },
-          400
-        );
-      }
-
-      const participant = await env.DB
-        .prepare(`
-          SELECT *
-          FROM participants
-          WHERE id = ?
-        `)
-        .bind(
-          lastOperation.participant_id
-        )
-        .first();
-
-      if (!participant) {
-        return jsonResponse(
-          { error: "原參賽者已不存在，無法復原" },
-          400
-        );
-      }
-
-      const now = await getNextTimestamp(env);
-
-      await env.DB.batch([
-        env.DB
-          .prepare(`
-            UPDATE participants
-            SET score = ?,
-                updated_at = ?
-            WHERE id = ?
-          `)
-          .bind(
-            lastOperation.old_score,
-            now,
-            lastOperation.participant_id
-          ),
-
-        env.DB
-          .prepare(`
-            INSERT INTO operation_logs (
-              action,
-              participant_id,
-              old_score,
-              new_score,
-              created_at
-            )
-            VALUES (?, ?, ?, ?, ?)
-          `)
-          .bind(
-            `UNDO:${lastOperation.id}`,
-            lastOperation.participant_id,
-            participant.score,
-            lastOperation.old_score,
-            now
-          )
-      ]);
-
-      await createRankingSnapshot(
-        env,
-        now
-      );
-
-      await refreshSession(
-        session.token,
-        env
-      );
-
-      return jsonResponse({
-        success: true
-      });
-    }
-
-    // =========================
-    // 操作紀錄
-    // =========================
-    if (
-      url.pathname === "/api/logs" &&
-      request.method === "GET"
-    ) {
-      const session = await requireAdmin(
-        request,
-        env
-      );
-
-      if (!session) {
-        return jsonResponse(
-          { error: "未登入管理員帳號" },
-          401
-        );
-      }
-
-      const { results } = await env.DB
-        .prepare(`
-          SELECT
-            operation_logs.id,
-            operation_logs.action,
-            operation_logs.participant_id,
-            operation_logs.old_score,
-            operation_logs.new_score,
-            operation_logs.created_at,
-            participants.name
-          FROM operation_logs
-          LEFT JOIN participants
-            ON participants.id = operation_logs.participant_id
-          ORDER BY operation_logs.id DESC
-          LIMIT 30
-        `)
-        .all();
-
-      await refreshSession(
-        session.token,
-        env
-      );
-
-      return jsonResponse({
-        logs: results || []
-      });
-    }
-
-    // =========================
     // 其他 API
     // =========================
-    if (url.pathname.startsWith("/api/")) {
+    if (
+      url.pathname.startsWith("/api/")
+    ) {
       return jsonResponse({
         status: "ok"
       });
@@ -827,130 +555,160 @@ export default {
 // 取得參賽者
 // =========================
 async function getParticipants(env) {
-  const { results } = await env.DB
-    .prepare(`
-      SELECT
-        id,
-        name,
-        score,
-        created_at,
-        updated_at
-      FROM participants
-      ORDER BY score DESC, id ASC
-    `)
-    .all();
+  const { results } =
+    await env.DB
+      .prepare(`
+        SELECT
+          id,
+          name,
+          score,
+          created_at,
+          updated_at
+        FROM participants
+        ORDER BY score DESC, id ASC
+      `)
+      .all();
 
   return results || [];
 }
 
 
 // =========================
-// 建立目前排名
+// 建立排名
 // =========================
-function buildRanking(participants) {
+function buildRanking(
+  participants
+) {
   return [...participants]
     .sort((a, b) => {
       const scoreDiff =
-        Number(b.score) - Number(a.score);
+        Number(b.score) -
+        Number(a.score);
 
       if (scoreDiff !== 0) {
         return scoreDiff;
       }
 
-      return Number(a.id) - Number(b.id);
+      return (
+        Number(a.id) -
+        Number(b.id)
+      );
     })
-    .map((participant, index) => ({
-      ...participant,
-      rank: index + 1
-    }));
+    .map(
+      (participant, index) => ({
+        ...participant,
+        rank: index + 1
+      })
+    );
 }
 
 
 // =========================
-// 建立排名快照
+// 取得競賽
 // =========================
-async function createRankingSnapshot(
-  env,
-  timestamp
+async function getCompetitions(
+  env
 ) {
-  const participants =
-    await getParticipants(env);
+  const { results } =
+    await env.DB
+      .prepare(`
+        SELECT
+          id,
+          name,
+          sort_order,
+          created_at,
+          updated_at
+        FROM competitions
+        ORDER BY sort_order ASC, id ASC
+      `)
+      .all();
 
-  const ranking =
-    buildRanking(participants);
-
-  if (!ranking.length) {
-    return;
-  }
-
-  const statements =
-    ranking.map((participant) => {
-      return env.DB
-        .prepare(`
-          INSERT INTO ranking_history (
-            participant_id,
-            rank,
-            created_at
-          )
-          VALUES (?, ?, ?)
-        `)
-        .bind(
-          participant.id,
-          participant.rank,
-          timestamp
-        );
-    });
-
-  await env.DB.batch(statements);
+  return results || [];
 }
 
 
 // =========================
-// 取得下一個時間戳
+// 取得網站設定
 // =========================
-async function getNextTimestamp(env) {
-  const latest = await env.DB
-    .prepare(`
-      SELECT created_at
-      FROM ranking_history
-      ORDER BY id DESC
-      LIMIT 1
-    `)
-    .first();
+async function getSiteSettings(
+  env
+) {
+  const { results } =
+    await env.DB
+      .prepare(`
+        SELECT
+          key,
+          value,
+          updated_at
+        FROM site_settings
+      `)
+      .all();
 
-  const now = Date.now();
+  const settings = {};
 
-  if (latest?.created_at) {
-    const latestTime =
-      new Date(latest.created_at).getTime();
-
-    if (now <= latestTime) {
-      return new Date(
-        latestTime + 1
-      ).toISOString();
-    }
+  for (
+    const row of results || []
+  ) {
+    settings[row.key] =
+      row.value;
   }
 
-  return new Date(now).toISOString();
+  return settings;
+}
+
+
+// =========================
+// 最新更新時間
+// =========================
+function getLatestUpdatedAt(
+  participants
+) {
+  if (!participants.length) {
+    return null;
+  }
+
+  return participants.reduce(
+    (latest, participant) => {
+      return participant.updated_at >
+        latest
+        ? participant.updated_at
+        : latest;
+    },
+    participants[0].updated_at
+  );
 }
 
 
 // =========================
 // Cookie
 // =========================
-function getCookie(request, name) {
+function getCookie(
+  request,
+  name
+) {
   const cookieHeader =
-    request.headers.get("Cookie") || "";
+    request.headers.get(
+      "Cookie"
+    ) || "";
 
   const cookies =
     cookieHeader.split(";");
 
-  for (const cookie of cookies) {
-    const [key, ...valueParts] =
-      cookie.trim().split("=");
+  for (
+    const cookie of cookies
+  ) {
+    const [
+      key,
+      ...valueParts
+    ] =
+      cookie
+        .trim()
+        .split("=");
 
     if (key === name) {
-      return valueParts.join("=");
+      return valueParts.join(
+        "="
+      );
     }
   }
 
@@ -961,35 +719,42 @@ function getCookie(request, name) {
 // =========================
 // Session
 // =========================
-async function getSession(request, env) {
-  const token = getCookie(
-    request,
-    SESSION_COOKIE
-  );
+async function getSession(
+  request,
+  env
+) {
+  const token =
+    getCookie(
+      request,
+      SESSION_COOKIE
+    );
 
   if (!token) {
     return null;
   }
 
-  const session = await env.DB
-    .prepare(`
-      SELECT
-        id,
-        token,
-        expires_at,
-        created_at
-      FROM sessions
-      WHERE token = ?
-    `)
-    .bind(token)
-    .first();
+  const session =
+    await env.DB
+      .prepare(`
+        SELECT
+          id,
+          token,
+          expires_at,
+          created_at
+        FROM sessions
+        WHERE token = ?
+      `)
+      .bind(token)
+      .first();
 
   if (!session) {
     return null;
   }
 
   const expiresAt =
-    new Date(session.expires_at);
+    new Date(
+      session.expires_at
+    );
 
   if (
     expiresAt.getTime() <=
@@ -1034,7 +799,9 @@ async function refreshSession(
   const expiresAt =
     new Date(
       Date.now() +
-      SESSION_MINUTES * 60 * 1000
+      SESSION_MINUTES *
+        60 *
+        1000
     );
 
   await env.DB
