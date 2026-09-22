@@ -13,6 +13,7 @@ async function loadRanking() {
     const data = await response.json();
 
     renderRanking(data.participants || []);
+
     updatedAt.textContent = data.updatedAt
       ? `更新於 ${formatTime(data.updatedAt)}`
       : "尚未更新";
@@ -94,8 +95,54 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-adminButton.addEventListener("click", () => {
-  alert("管理員功能即將加入");
-});
+async function adminLogin() {
+  const password = prompt("請輸入管理員密碼");
+
+  if (password === null) {
+    return;
+  }
+
+  if (!password) {
+    alert("請輸入密碼");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        password
+      })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      alert(data.error || "登入失敗");
+      return;
+    }
+
+    const sessionResponse = await fetch("/api/me");
+
+    if (!sessionResponse.ok) {
+      alert("登入驗證失敗");
+      return;
+    }
+
+    const sessionData = await sessionResponse.json();
+
+    if (sessionData.authenticated) {
+      alert("管理員登入成功");
+      adminButton.textContent = "🔓";
+    }
+  } catch (error) {
+    alert("目前無法登入");
+  }
+}
+
+adminButton.addEventListener("click", adminLogin);
 
 loadRanking();
