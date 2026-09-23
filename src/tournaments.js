@@ -1,18 +1,3 @@
-// ============================================================
-// tournaments.js
-//
-// 賽程安排器的 API。跟排行榜(index.js)完全獨立,
-// 不會互相影響 — 排行榜可以照常運作,賽程功能也可以單獨使用。
-//
-// 路由:
-//   GET    /api/tournaments
-//   POST   /api/tournaments
-//   GET    /api/tournaments/:id
-//   DELETE /api/tournaments/:id
-//   PATCH  /api/tournaments/:id/matches/:matchId
-//   POST   /api/tournaments/:id/randomize
-// ============================================================
-
 import { generateBracket } from "./bracket-engine.js";
 
 export async function handleTournamentRoutes(
@@ -24,13 +9,7 @@ export async function handleTournamentRoutes(
 ) {
   const path = url.pathname;
 
-  // ============================================================
-  // 列表
-  // ============================================================
-  if (
-    path === "/api/tournaments" &&
-    request.method === "GET"
-  ) {
+  if (path === "/api/tournaments" && request.method === "GET") {
     const rows = await env.DB.prepare(`
       SELECT
         t.id,
@@ -53,66 +32,41 @@ export async function handleTournamentRoutes(
     });
   }
 
-  // ============================================================
-  // 建立新賽事
-  // ============================================================
-  if (
-    path === "/api/tournaments" &&
-    request.method === "POST"
-  ) {
-    const session = await requireAdmin(
-      request,
-      env
-    );
+  if (path === "/api/tournaments" && request.method === "POST") {
+    const session = await requireAdmin(request, env);
 
     if (!session) {
       return jsonResponse(
-        {
-          error: "未登入管理員帳號"
-        },
+        { error: "未登入管理員帳號" },
         401
       );
     }
 
-    const body =
-      await request
-        .json()
-        .catch(() => ({}));
+    const body = await request.json().catch(
+      () => ({})
+    );
 
     const name =
-      String(
-        body.name || ""
-      ).trim();
+      String(body.name || "").trim();
 
     const format =
-      String(
-        body.format || ""
-      );
+      String(body.format || "");
 
     const randomize =
-      Boolean(
-        body.randomize
-      );
+      Boolean(body.randomize);
 
     let names =
-      Array.isArray(
-        body.participants
-      )
+      Array.isArray(body.participants)
         ? body.participants
             .map((n) =>
-              String(
-                n || ""
-              ).trim()
+              String(n || "").trim()
             )
             .filter(Boolean)
         : [];
 
     if (!name) {
       return jsonResponse(
-        {
-          error:
-            "賽事名稱不能為空白"
-        },
+        { error: "賽事名稱不能為空白" },
         400
       );
     }
@@ -124,9 +78,7 @@ export async function handleTournamentRoutes(
       ].includes(format)
     ) {
       return jsonResponse(
-        {
-          error: "賽制錯誤"
-        },
+        { error: "賽制錯誤" },
         400
       );
     }
@@ -144,19 +96,15 @@ export async function handleTournamentRoutes(
       );
     }
 
-    // 建立賽事時如果勾選 randomize,
-    // 仍然沿用原本的參賽者洗牌功能。
     if (randomize) {
       names = shuffle(names);
     }
 
     const seedParticipants =
-      names.map(
-        (n, i) => ({
-          id: i + 1,
-          name: n
-        })
-      );
+      names.map((n, i) => ({
+        id: i + 1,
+        name: n
+      }));
 
     let generated;
 
@@ -180,9 +128,6 @@ export async function handleTournamentRoutes(
     const now =
       new Date().toISOString();
 
-    // ============================================================
-    // 建立賽事
-    // ============================================================
     const tournamentInsert =
       await env.DB.prepare(`
         INSERT INTO tournaments (
@@ -193,31 +138,29 @@ export async function handleTournamentRoutes(
           created_at,
           updated_at
         )
-        VALUES (?, ?, ?, 'in_progress', ?, ?)
-      `)
-        .bind(
-          name,
-          format,
-          names.length,
-          now,
-          now
+        VALUES (
+          ?,
+          ?,
+          ?,
+          'in_progress',
+          ?,
+          ?
         )
-        .run();
+      `).bind(
+        name,
+        format,
+        names.length,
+        now,
+        now
+      ).run();
 
     const tournamentId =
-      tournamentInsert
-        .meta
-        .last_row_id;
+      tournamentInsert.meta.last_row_id;
 
-    // ============================================================
-    // 建立參賽者
-    // ============================================================
     const seedToDbId =
       new Map();
 
-    for (
-      const p of seedParticipants
-    ) {
+    for (const p of seedParticipants) {
       const res =
         await env.DB.prepare(`
           INSERT INTO tournament_participants (
@@ -227,14 +170,12 @@ export async function handleTournamentRoutes(
             created_at
           )
           VALUES (?, ?, ?, ?)
-        `)
-          .bind(
-            tournamentId,
-            p.name,
-            p.id,
-            now
-          )
-          .run();
+        `).bind(
+          tournamentId,
+          p.name,
+          p.id,
+          now
+        ).run();
 
       seedToDbId.set(
         p.id,
@@ -245,28 +186,13 @@ export async function handleTournamentRoutes(
     const resolveParticipant =
       (p) =>
         p
-          ? seedToDbId.get(
-              p.id
-            ) || null
+          ? seedToDbId.get(p.id) || null
           : null;
 
-    // ============================================================
-    // Phase A
-    //
-    // 先建立所有比賽。
-    // 這時候 next_match_id 還不能寫,
-    // 因為 DB id 尚未全部產生。
-    //
-    // play_order 故意先保持 NULL。
-    // 後面由 refreshReadyMatches()
-    // 按照真正可以開始的場次分配。
-    // ============================================================
     const tempIdToDbId =
       new Map();
 
-    for (
-      const m of generated.matches
-    ) {
+    for (const m of generated.matches) {
       const status =
         m.status ||
         (
@@ -292,36 +218,42 @@ export async function handleTournamentRoutes(
             created_at,
             updated_at
           )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `)
-          .bind(
-            tournamentId,
-            m.bracket,
-            m.round,
-            m.position,
-            resolveParticipant(
-              m.participant1
-            ),
-            resolveParticipant(
-              m.participant2
-            ),
-            resolveParticipant(
-              m.winner
-            ),
-            status,
-            m.isByeMatch
-              ? 1
-              : 0,
-            m.isGrandFinal
-              ? 1
-              : 0,
-            m.isResetMatch
-              ? 1
-              : 0,
-            now,
-            now
+          VALUES (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
           )
-          .run();
+        `).bind(
+          tournamentId,
+          m.bracket,
+          m.round,
+          m.position,
+          resolveParticipant(
+            m.participant1
+          ),
+          resolveParticipant(
+            m.participant2
+          ),
+          resolveParticipant(
+            m.winner
+          ),
+          status,
+          m.isByeMatch ? 1 : 0,
+          m.isGrandFinal ? 1 : 0,
+          m.isResetMatch ? 1 : 0,
+          now,
+          now
+        ).run();
 
       tempIdToDbId.set(
         m.id,
@@ -329,14 +261,7 @@ export async function handleTournamentRoutes(
       );
     }
 
-    // ============================================================
-    // Phase B
-    //
-    // 補上比賽之間的連線關係
-    // ============================================================
-    for (
-      const m of generated.matches
-    ) {
+    for (const m of generated.matches) {
       if (
         !m.nextMatchId &&
         !m.loserNextMatchId
@@ -352,44 +277,47 @@ export async function handleTournamentRoutes(
           loser_next_match_id = ?,
           loser_next_match_slot = ?
         WHERE id = ?
-      `)
-        .bind(
-          m.nextMatchId
-            ? tempIdToDbId.get(
-                m.nextMatchId
-              )
-            : null,
+      `).bind(
+        m.nextMatchId
+          ? tempIdToDbId.get(
+              m.nextMatchId
+            )
+          : null,
 
-          m.nextMatchId
-            ? m.nextMatchSlot
-            : null,
+        m.nextMatchId
+          ? m.nextMatchSlot
+          : null,
 
-          m.loserNextMatchId
-            ? tempIdToDbId.get(
-                m.loserNextMatchId
-              )
-            : null,
+        m.loserNextMatchId
+          ? tempIdToDbId.get(
+              m.loserNextMatchId
+            )
+          : null,
 
-          m.loserNextMatchId
-            ? m.loserNextMatchSlot
-            : null,
+        m.loserNextMatchId
+          ? m.loserNextMatchSlot
+          : null,
 
-          tempIdToDbId.get(
-            m.id
-          )
-        )
-        .run();
+        tempIdToDbId.get(m.id)
+      ).run();
     }
 
-    // ============================================================
-    // Phase C
-    //
-    // 處理建立賽程時就已經完成的第一輪 Bye。
-    //
-    // Bye 本身不算正式比賽,
-    // 但 Bye 勝者必須繼續往下一場傳遞。
-    // ============================================================
-    const initialByeRows =
+    /*
+     * 新賽事重新建立 play_order。
+     * BYE 不佔正式場次。
+     */
+    await env.DB.prepare(`
+      UPDATE tournament_matches
+      SET play_order = NULL
+      WHERE tournament_id = ?
+    `).bind(
+      tournamentId
+    ).run();
+
+    /*
+     * 找出第一輪已經確定的 BYE。
+     */
+    const initialByes =
       await env.DB.prepare(`
         SELECT
           id,
@@ -398,50 +326,40 @@ export async function handleTournamentRoutes(
           next_match_slot
         FROM tournament_matches
         WHERE tournament_id = ?
-          AND status = 'completed'
           AND is_bye_match = 1
+          AND status = 'completed'
           AND winner_id IS NOT NULL
-          AND next_match_id IS NOT NULL
-      `)
-        .bind(tournamentId)
-        .all();
+      `).bind(
+        tournamentId
+      ).all();
 
-    const initialByeQueue =
-      (
-        initialByeRows.results ||
-        []
-      ).map(
-        (row) => ({
+    const initialQueue =
+      (initialByes.results || [])
+        .filter(
+          (match) =>
+            match.next_match_id
+        )
+        .map((match) => ({
           matchId:
-            row.next_match_id,
+            match.next_match_id,
           slot:
-            row.next_match_slot,
+            match.next_match_slot,
           participantId:
-            row.winner_id
-        })
-      );
+            match.winner_id
+        }));
 
-    if (
-      initialByeQueue.length >
-      0
-    ) {
+    if (initialQueue.length) {
       await propagate(
         env,
         tournamentId,
-        initialByeQueue
+        initialQueue
+      );
+    } else {
+      await refreshReadyMatches(
+        env,
+        tournamentId
       );
     }
-
-    // ============================================================
-    // 建立完成後一定重新整理一次 ready 狀態。
-    //
-    // 這裡不能只放在 initialByeQueue 裡面,
-    // 因為 4、8、16、32、48 等情況可能沒有 Bye Queue。
-    // ============================================================
-    await refreshReadyMatches(
-      env,
-      tournamentId
-    );
 
     return jsonResponse({
       success: true,
@@ -449,18 +367,12 @@ export async function handleTournamentRoutes(
     });
   }
 
-  // ============================================================
-  // 隨機排列比賽順序
-  //
-  // 規則:
-  // 1. 只能管理員操作
-  // 2. 賽事完成後不能操作
-  // 3. 只要正式比賽已有 completed,
-  //    就視為已經開始,不能再隨機
-  // 4. BYE 不算開始比賽
-  // 5. 可以在正式開賽前重複執行
-  // 6. 只重新排列第一輪「正式比賽」
-  // ============================================================
+  /*
+   * ==========================================================
+   * 隨機重新排列第一輪正式比賽的「場次順序」
+   * ==========================================================
+   */
+
   const randomizeMatch =
     path.match(
       /^\/api\/tournaments\/(\d+)\/randomize$/
@@ -495,15 +407,13 @@ export async function handleTournamentRoutes(
       await env.DB.prepare(`
         SELECT
           id,
-          name,
           format,
-          size,
           status
         FROM tournaments
         WHERE id = ?
-      `)
-        .bind(tournamentId)
-        .first();
+      `).bind(
+        tournamentId
+      ).first();
 
     if (!tournament) {
       return jsonResponse(
@@ -522,18 +432,18 @@ export async function handleTournamentRoutes(
       return jsonResponse(
         {
           error:
-            "賽事已經完成，無法再隨機排列"
+            "賽事已完成，無法再隨機排列"
         },
         400
       );
     }
 
-    // ============================================================
-    // 正式比賽只要有一場 completed,
-    // 就代表賽事已經開始。
-    //
-    // BYE excluded.
-    // ============================================================
+    /*
+     * BYE 不算正式比賽開始。
+     *
+     * 只要有任何正式比賽完成，
+     * 就代表賽事已經開始。
+     */
     const started =
       await env.DB.prepare(`
         SELECT id
@@ -542,9 +452,9 @@ export async function handleTournamentRoutes(
           AND is_bye_match = 0
           AND status = 'completed'
         LIMIT 1
-      `)
-        .bind(tournamentId)
-        .first();
+      `).bind(
+        tournamentId
+      ).first();
 
     if (started) {
       return jsonResponse(
@@ -556,14 +466,15 @@ export async function handleTournamentRoutes(
       );
     }
 
-    // ============================================================
-    // 只抓第一輪正式比賽。
-    // BYE 不參與隨機場次。
-    // ============================================================
-    const firstRound =
+    /*
+     * 隨機的是第一輪正式比賽的「場次順序」。
+     *
+     * 不重新配對參賽者。
+     * 不改變 bracket 結構。
+     */
+    const rows =
       await env.DB.prepare(`
-        SELECT
-          id
+        SELECT id
         FROM tournament_matches
         WHERE tournament_id = ?
           AND bracket = 'winners'
@@ -571,59 +482,77 @@ export async function handleTournamentRoutes(
           AND is_bye_match = 0
           AND status != 'completed'
           AND status != 'void'
-        ORDER BY
-          position ASC,
-          id ASC
-      `)
-        .bind(tournamentId)
-        .all();
+        ORDER BY id ASC
+      `).bind(
+        tournamentId
+      ).all();
 
     const matchIds =
       shuffle(
-        (
-          firstRound.results ||
-          []
-        ).map(
-          (row) => row.id
-        )
+        (rows.results || [])
+          .map(
+            (row) =>
+              Number(row.id)
+          )
       );
 
-    // ============================================================
-    // 重新分配場次 1、2、3、4...
-    // ============================================================
-    for (
-      let i = 0;
-      i < matchIds.length;
-      i++
-    ) {
-      await env.DB.prepare(`
-        UPDATE tournament_matches
-        SET
-          play_order = ?,
-          updated_at = ?
-        WHERE id = ?
-          AND tournament_id = ?
-      `)
-        .bind(
-          i + 1,
-          new Date().toISOString(),
-          matchIds[i],
-          tournamentId
-        )
-        .run();
+    if (!matchIds.length) {
+      return jsonResponse({
+        success: true,
+        randomized: 0
+      });
     }
+
+    const statements = [
+      env.DB.prepare(`
+        UPDATE tournament_matches
+        SET play_order = NULL
+        WHERE tournament_id = ?
+          AND bracket = 'winners'
+          AND round = 1
+          AND is_bye_match = 0
+      `).bind(
+        tournamentId
+      )
+    ];
+
+    matchIds.forEach(
+      (matchId, index) => {
+        statements.push(
+          env.DB.prepare(`
+            UPDATE tournament_matches
+            SET
+              play_order = ?,
+              updated_at = ?
+            WHERE id = ?
+              AND tournament_id = ?
+          `).bind(
+            index + 1,
+            new Date().toISOString(),
+            matchId,
+            tournamentId
+          )
+        );
+      }
+    );
+
+    await env.DB.batch(
+      statements
+    );
 
     return jsonResponse({
       success: true,
-      message:
-        "第一輪比賽順序已重新隨機排列",
-      count: matchIds.length
+      randomized:
+        matchIds.length
     });
   }
 
-  // ============================================================
-  // 單一賽事詳細資料
-  // ============================================================
+  /*
+   * ==========================================================
+   * 單一賽事
+   * ==========================================================
+   */
+
   const detailMatch =
     path.match(
       /^\/api\/tournaments\/(\d+)$/
@@ -659,9 +588,12 @@ export async function handleTournamentRoutes(
     );
   }
 
-  // ============================================================
-  // 刪除賽事
-  // ============================================================
+  /*
+   * ==========================================================
+   * 刪除賽事
+   * ==========================================================
+   */
+
   if (
     detailMatch &&
     request.method === "DELETE"
@@ -690,18 +622,21 @@ export async function handleTournamentRoutes(
     await env.DB.prepare(`
       DELETE FROM tournaments
       WHERE id = ?
-    `)
-      .bind(tournamentId)
-      .run();
+    `).bind(
+      tournamentId
+    ).run();
 
     return jsonResponse({
       success: true
     });
   }
 
-  // ============================================================
-  // 登錄比賽結果
-  // ============================================================
+  /*
+   * ==========================================================
+   * 登錄比賽結果
+   * ==========================================================
+   */
+
   const matchResultMatch =
     path.match(
       /^\/api\/tournaments\/(\d+)\/matches\/(\d+)$/
@@ -738,11 +673,9 @@ export async function handleTournamentRoutes(
       );
 
     const body =
-      await request
-        .json()
-        .catch(
-          () => ({})
-        );
+      await request.json().catch(
+        () => ({})
+      );
 
     const winnerId =
       Number(
@@ -750,22 +683,16 @@ export async function handleTournamentRoutes(
       );
 
     const score1 =
-      body.score1 ===
-        undefined ||
+      body.score1 === undefined ||
       body.score1 === null
         ? null
-        : Number(
-            body.score1
-          );
+        : Number(body.score1);
 
     const score2 =
-      body.score2 ===
-        undefined ||
+      body.score2 === undefined ||
       body.score2 === null
         ? null
-        : Number(
-            body.score2
-          );
+        : Number(body.score2);
 
     const match =
       await env.DB.prepare(`
@@ -773,12 +700,10 @@ export async function handleTournamentRoutes(
         FROM tournament_matches
         WHERE id = ?
           AND tournament_id = ?
-      `)
-        .bind(
-          matchId,
-          tournamentId
-        )
-        .first();
+      `).bind(
+        matchId,
+        tournamentId
+      ).first();
 
     if (!match) {
       return jsonResponse(
@@ -787,6 +712,18 @@ export async function handleTournamentRoutes(
             "找不到這場比賽"
         },
         404
+      );
+    }
+
+    if (
+      match.is_bye_match
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "BYE 比賽會自動晉級，不能手動登錄結果"
+        },
+        400
       );
     }
 
@@ -803,12 +740,10 @@ export async function handleTournamentRoutes(
       );
     }
 
-    // ============================================================
-    // 防止管理員直接跳過比賽順序。
-    //
-    // 只有 ready 才能正式登錄結果。
-    // pending / void / 其他狀態都不允許。
-    // ============================================================
+    /*
+     * 核心規則：
+     * 只有 ready 才可以登錄。
+     */
     if (
       match.status !==
       "ready"
@@ -866,18 +801,6 @@ export async function handleTournamentRoutes(
       winnerId
     );
 
-    // ============================================================
-    // 特殊賽事處理後再整理一次 ready。
-    //
-    // 對單淘汰不會破壞既有狀態。
-    // 對雙敗 Grand Final / Reset 則可確保
-    // 新產生的正式場次取得 play_order。
-    // ============================================================
-    await refreshReadyMatches(
-      env,
-      tournamentId
-    );
-
     return jsonResponse({
       success: true
     });
@@ -885,10 +808,6 @@ export async function handleTournamentRoutes(
 
   return null;
 }
-
-// ============================================================
-// 完成一場比賽
-// ============================================================
 
 async function completeMatch(
   env,
@@ -914,16 +833,14 @@ async function completeMatch(
       updated_at = ?
     WHERE id = ?
       AND tournament_id = ?
-  `)
-    .bind(
-      winnerId,
-      score1,
-      score2,
-      now,
-      matchId,
-      tournamentId
-    )
-    .run();
+  `).bind(
+    winnerId,
+    score1,
+    score2,
+    now,
+    matchId,
+    tournamentId
+  ).run();
 
   const match =
     await env.DB.prepare(`
@@ -931,22 +848,18 @@ async function completeMatch(
       FROM tournament_matches
       WHERE id = ?
         AND tournament_id = ?
-    `)
-      .bind(
-        matchId,
-        tournamentId
-      )
-      .first();
+    `).bind(
+      matchId,
+      tournamentId
+    ).first();
+
+  if (!match) {
+    return;
+  }
 
   const queue = [];
 
-  // ============================================================
-  // 勝者 → 勝部下一場
-  // ============================================================
-  if (
-    match &&
-    match.next_match_id
-  ) {
+  if (match.next_match_id) {
     queue.push({
       matchId:
         match.next_match_id,
@@ -957,11 +870,7 @@ async function completeMatch(
     });
   }
 
-  // ============================================================
-  // 敗者 → 敗部下一場
-  // ============================================================
   if (
-    match &&
     loserId &&
     match.loser_next_match_id
   ) {
@@ -982,27 +891,6 @@ async function completeMatch(
   );
 }
 
-// ============================================================
-// 傳遞參賽者
-//
-// queue:
-// {
-//   matchId,
-//   slot,
-//   participantId
-// }
-//
-// slot = 1 → participant1_id
-// slot = 2 → participant2_id
-//
-// 注意:
-// 這裡不直接決定正式比賽 ready。
-// 所有 ready 狀態統一交給 refreshReadyMatches()。
-// 這樣單淘汰才能確保:
-// 第一輪全部完成 → 第二輪
-// 第二輪全部完成 → 第三輪
-// ============================================================
-
 async function propagate(
   env,
   tournamentId,
@@ -1011,16 +899,17 @@ async function propagate(
   const now =
     new Date().toISOString();
 
-  while (
-    queue.length > 0
-  ) {
+  while (queue.length > 0) {
     const {
       matchId,
       slot,
       participantId
     } = queue.shift();
 
-    if (!matchId) {
+    if (
+      !matchId ||
+      !participantId
+    ) {
       continue;
     }
 
@@ -1030,12 +919,10 @@ async function propagate(
         FROM tournament_matches
         WHERE id = ?
           AND tournament_id = ?
-      `)
-        .bind(
-          matchId,
-          tournamentId
-        )
-        .first();
+      `).bind(
+        matchId,
+        tournamentId
+      ).first();
 
     if (
       !target ||
@@ -1052,37 +939,46 @@ async function propagate(
         ? "participant1_id"
         : "participant2_id";
 
-    await env.DB.prepare(`
-      UPDATE tournament_matches
-      SET
-        ${column} = ?,
-        updated_at = ?
-      WHERE id = ?
-        AND tournament_id = ?
-    `)
-      .bind(
+    const existingParticipant =
+      slot === 1
+        ? target.participant1_id
+        : target.participant2_id;
+
+    if (
+      existingParticipant &&
+      Number(
+        existingParticipant
+      ) !==
+        Number(participantId)
+    ) {
+      continue;
+    }
+
+    if (!existingParticipant) {
+      await env.DB.prepare(`
+        UPDATE tournament_matches
+        SET ${column} = ?,
+            updated_at = ?
+        WHERE id = ?
+          AND tournament_id = ?
+      `).bind(
         participantId,
         now,
         matchId,
         tournamentId
-      )
-      .run();
+      ).run();
+    }
 
     const p1 =
-      column ===
-      "participant1_id"
+      slot === 1
         ? participantId
         : target.participant1_id;
 
     const p2 =
-      column ===
-      "participant2_id"
+      slot === 2
         ? participantId
         : target.participant2_id;
 
-    // ============================================================
-    // Bye
-    // ============================================================
     if (
       target.is_bye_match
     ) {
@@ -1098,19 +994,17 @@ async function propagate(
           SET
             winner_id = ?,
             status = 'completed',
+            play_order = NULL,
             updated_at = ?
           WHERE id = ?
             AND tournament_id = ?
-        `)
-          .bind(
-            solo,
-            now,
-            matchId,
-            tournamentId
-          )
-          .run();
+        `).bind(
+          solo,
+          now,
+          matchId,
+          tournamentId
+        ).run();
 
-        // Bye 勝者繼續往下一場
         if (
           target.next_match_id
         ) {
@@ -1127,14 +1021,6 @@ async function propagate(
 
       continue;
     }
-
-    // ============================================================
-    // 正式比賽
-    //
-    // 不在這裡直接 ready。
-    // 等 queue 全部處理完之後,
-    // 由 refreshReadyMatches() 統一判斷。
-    // ============================================================
   }
 
   await refreshReadyMatches(
@@ -1143,44 +1029,18 @@ async function propagate(
   );
 }
 
-// ============================================================
-// 整理「可以開始的比賽」
-//
-// 單淘汰規則:
-//
-// Round 1:
-//   只要兩位選手都到位 → ready
-//
-// Round 2:
-//   Round 1 所有場次必須 completed / void
-//   才能讓 Round 2 ready
-//
-// Round 3:
-//   Round 2 所有場次必須 completed / void
-//   才能讓 Round 3 ready
-//
-// 依此類推。
-//
-// Bye:
-//   completed 不算正式比賽,
-//   但會被視為該輪已經完成。
-// ============================================================
-
 async function refreshReadyMatches(
   env,
   tournamentId
 ) {
   const tournament =
     await env.DB.prepare(`
-      SELECT
-        id,
-        format,
-        status
+      SELECT format
       FROM tournaments
       WHERE id = ?
-    `)
-      .bind(tournamentId)
-      .first();
+    `).bind(
+      tournamentId
+    ).first();
 
   if (!tournament) {
     return;
@@ -1188,393 +1048,467 @@ async function refreshReadyMatches(
 
   const rows =
     await env.DB.prepare(`
-      SELECT
-        *
+      SELECT *
       FROM tournament_matches
       WHERE tournament_id = ?
-        AND bracket = 'winners'
       ORDER BY
+        bracket ASC,
         round ASC,
         position ASC,
         id ASC
-    `)
-      .bind(tournamentId)
-      .all();
+    `).bind(
+      tournamentId
+    ).all();
 
   const matches =
     rows.results || [];
 
-  if (!matches.length) {
-    return;
-  }
+  const now =
+    new Date().toISOString();
 
-  // ============================================================
-  // 找目前最大的 play_order。
-  //
-  // play_order 只給正式可以進行的比賽。
-  // Bye 不需要佔用場次號碼。
-  // ============================================================
-  let maxPlayOrder = 0;
+  const cleanupStatements =
+    [];
 
-  for (
-    const match of matches
-  ) {
+  for (const match of matches) {
     if (
-      match.is_bye_match
+      Number(
+        match.is_bye_match
+      ) === 1 ||
+      match.status === "void"
     ) {
-      continue;
-    }
-
-    if (
-      match.play_order !==
-        null &&
-      match.play_order !==
-        undefined
-    ) {
-      const value =
-        Number(
-          match.play_order
-        );
-
       if (
-        Number.isFinite(
-          value
-        ) &&
-        value > maxPlayOrder
+        match.play_order !== null
       ) {
-        maxPlayOrder =
-          value;
+        cleanupStatements.push(
+          env.DB.prepare(`
+            UPDATE tournament_matches
+            SET
+              play_order = NULL,
+              updated_at = ?
+            WHERE id = ?
+          `).bind(
+            now,
+            match.id
+          )
+        );
       }
     }
   }
 
-  let nextPlayOrder =
-    maxPlayOrder + 1;
+  if (
+    cleanupStatements.length
+  ) {
+    await env.DB.batch(
+      cleanupStatements
+    );
+  }
 
-  // ============================================================
-  // 單淘汰
-  // ============================================================
   if (
     tournament.format ===
     "single_elimination"
   ) {
-    const rounds =
-      [
-        ...new Set(
-          matches.map(
-            (m) =>
-              Number(
-                m.round
-              )
-          )
-        )
-      ].sort(
-        (a, b) =>
-          a - b
-      );
-
-    for (
-      const round of rounds
-    ) {
-      const roundMatches =
-        matches.filter(
-          (m) =>
-            Number(
-              m.round
-            ) === round
-        );
-
-      // ==========================================================
-      // Round 1 永遠可以依照參賽者是否到位判斷。
-      //
-      // Round 2 之後:
-      // 前一輪所有比賽必須 completed / void。
-      // ==========================================================
-      let previousRoundFinished =
-        true;
-
-      if (
-        round >
-        rounds[0]
-      ) {
-        const previousRound =
-          round - 1;
-
-        const previousMatches =
-          matches.filter(
-            (m) =>
-              Number(
-                m.round
-              ) ===
-              previousRound
-          );
-
-        previousRoundFinished =
-          previousMatches.length >
-            0 &&
-          previousMatches.every(
-            (m) =>
-              m.status ===
-                "completed" ||
-              m.status ===
-                "void"
-          );
-      }
-
-      for (
-        const match of roundMatches
-      ) {
-        // Bye 不需要再判斷 ready。
-        if (
-          match.is_bye_match
-        ) {
-          continue;
-        }
-
-        // 已經完成的正式比賽不能被重新開啟。
-        if (
-          match.status ===
-          "completed"
-        ) {
-          continue;
-        }
-
-        // void 也不處理。
-        if (
-          match.status ===
-          "void"
-        ) {
-          continue;
-        }
-
-        const hasBothPlayers =
-          Boolean(
-            match.participant1_id
-          ) &&
-          Boolean(
-            match.participant2_id
-          );
-
-        // ========================================================
-        // 前一輪尚未全部完成:
-        // 強制維持 pending。
-        // ========================================================
-        if (
-          !previousRoundFinished
-        ) {
-          if (
-            match.status !==
-            "pending"
-          ) {
-            await env.DB.prepare(`
-              UPDATE tournament_matches
-              SET
-                status = 'pending',
-                updated_at = ?
-              WHERE id = ?
-                AND tournament_id = ?
-            `)
-              .bind(
-                new Date().toISOString(),
-                match.id,
-                tournamentId
-              )
-              .run();
-          }
-
-          continue;
-        }
-
-        // ========================================================
-        // 前一輪完成 + 雙方都到位 → ready
-        // ========================================================
-        if (
-          hasBothPlayers
-        ) {
-          if (
-            match.status !==
-            "ready"
-          ) {
-            await env.DB.prepare(`
-              UPDATE tournament_matches
-              SET
-                status = 'ready',
-                updated_at = ?
-              WHERE id = ?
-                AND tournament_id = ?
-            `)
-              .bind(
-                new Date().toISOString(),
-                match.id,
-                tournamentId
-              )
-              .run();
-
-            match.status =
-              "ready";
-          }
-
-          // ======================================================
-          // 尚未有場次編號,
-          // 才分配新的 play_order。
-          //
-          // 這可以避免 refresh 時一直重新編號。
-          // ======================================================
-          if (
-            match.play_order ===
-              null ||
-            match.play_order ===
-              undefined
-          ) {
-            await env.DB.prepare(`
-              UPDATE tournament_matches
-              SET
-                play_order = ?,
-                updated_at = ?
-              WHERE id = ?
-                AND tournament_id = ?
-            `)
-              .bind(
-                nextPlayOrder,
-                new Date().toISOString(),
-                match.id,
-                tournamentId
-              )
-              .run();
-
-            match.play_order =
-              nextPlayOrder;
-
-            nextPlayOrder++;
-          }
-        } else {
-          // ======================================================
-          // 人還沒到齊 → pending
-          // ======================================================
-          if (
-            match.status !==
-            "pending"
-          ) {
-            await env.DB.prepare(`
-              UPDATE tournament_matches
-              SET
-                status = 'pending',
-                updated_at = ?
-              WHERE id = ?
-                AND tournament_id = ?
-            `)
-              .bind(
-                new Date().toISOString(),
-                match.id,
-                tournamentId
-              )
-              .run();
-
-            match.status =
-              "pending";
-          }
-        }
-      }
-    }
-
+    await refreshSingleElimination(
+      env,
+      tournamentId,
+      matches
+    );
     return;
   }
 
-  // ============================================================
-  // 雙敗
-  //
-  // 雙敗暫時維持原本邏輯:
-  // 雙方都到位即可 ready。
-  //
-  // 這裡不套用單淘汰的「整輪完成後才下一輪」限制,
-  // 避免破壞既有 losers bracket 流程。
-  // ============================================================
-  if (
-    tournament.format ===
-    "double_elimination"
-  ) {
-    const now =
-      new Date().toISOString();
+  await refreshDoubleElimination(
+    env,
+    tournamentId,
+    matches
+  );
+}
 
-    for (
-      const match of matches
+async function refreshSingleElimination(
+  env,
+  tournamentId,
+  matches
+) {
+  const winners =
+    matches
+      .filter(
+        (match) =>
+          match.bracket ===
+            "winners" &&
+          Number(
+            match.is_bye_match
+          ) !== 1 &&
+          match.status !==
+            "void"
+      )
+      .sort(
+        (a, b) =>
+          Number(a.round) -
+            Number(b.round) ||
+          Number(a.position) -
+            Number(b.position) ||
+          Number(a.id) -
+            Number(b.id)
+      );
+
+  const now =
+    new Date().toISOString();
+
+  const updates = [];
+
+  const rounds = [
+    ...new Set(
+      winners.map(
+        (match) =>
+          Number(match.round)
+      )
+    )
+  ].sort(
+    (a, b) => a - b
+  );
+
+  const roundComplete =
+    new Map();
+
+  for (const round of rounds) {
+    const roundMatches =
+      winners.filter(
+        (match) =>
+          Number(match.round) ===
+          round
+      );
+
+    const complete =
+      roundMatches.length > 0 &&
+      roundMatches.every(
+        (match) =>
+          match.status ===
+            "completed" ||
+          match.status ===
+            "void"
+      );
+
+    roundComplete.set(
+      round,
+      complete
+    );
+  }
+
+  for (const match of winners) {
+    if (
+      match.status ===
+      "completed"
     ) {
-      if (
-        match.is_bye_match ||
-        match.status ===
-          "completed" ||
-        match.status ===
-          "void"
-      ) {
-        continue;
-      }
+      continue;
+    }
 
-      if (
+    const round =
+      Number(match.round);
+
+    let shouldBeReady =
+      Boolean(
         match.participant1_id &&
         match.participant2_id
-      ) {
-        if (
-          match.status !==
-          "ready"
-        ) {
-          await env.DB.prepare(`
-            UPDATE tournament_matches
-            SET
-              status = 'ready',
-              updated_at = ?
-            WHERE id = ?
-              AND tournament_id = ?
-          `)
-            .bind(
-              now,
-              match.id,
-              tournamentId
-            )
-            .run();
+      );
 
-          match.status =
-            "ready";
+    if (round > 1) {
+      shouldBeReady =
+        shouldBeReady &&
+        roundComplete.get(
+          round - 1
+        ) === true;
+    }
+
+    const nextStatus =
+      shouldBeReady
+        ? "ready"
+        : "pending";
+
+    if (
+      match.status !==
+      nextStatus
+    ) {
+      updates.push(
+        env.DB.prepare(`
+          UPDATE tournament_matches
+          SET
+            status = ?,
+            updated_at = ?
+          WHERE id = ?
+        `).bind(
+          nextStatus,
+          now,
+          match.id
+        )
+      );
+    }
+  }
+
+  if (updates.length) {
+    await env.DB.batch(
+      updates
+    );
+  }
+
+  const latest =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        round,
+        position,
+        status,
+        play_order,
+        is_bye_match
+      FROM tournament_matches
+      WHERE tournament_id = ?
+        AND bracket = 'winners'
+        AND status != 'void'
+        AND is_bye_match = 0
+    `).bind(
+      tournamentId
+    ).all();
+
+  const latestMatches =
+    latest.results || [];
+
+  const playable =
+    latestMatches
+      .filter(
+        (match) =>
+          match.status ===
+            "completed" ||
+          match.status ===
+            "ready"
+      )
+      .sort(
+        (a, b) => {
+          const aOrder =
+            a.play_order === null ||
+            a.play_order === undefined
+              ? Number.MAX_SAFE_INTEGER
+              : Number(
+                  a.play_order
+                );
+
+          const bOrder =
+            b.play_order === null ||
+            b.play_order === undefined
+              ? Number.MAX_SAFE_INTEGER
+              : Number(
+                  b.play_order
+                );
+
+          return (
+            aOrder - bOrder ||
+            Number(a.round) -
+              Number(b.round) ||
+            Number(a.position) -
+              Number(b.position) ||
+            Number(a.id) -
+              Number(b.id)
+          );
         }
+      );
 
-        if (
-          match.play_order ===
-            null ||
-          match.play_order ===
-            undefined
-        ) {
-          await env.DB.prepare(`
+  const normalizeStatements =
+    [];
+
+  playable.forEach(
+    (match, index) => {
+      const order =
+        index + 1;
+
+      if (
+        Number(
+          match.play_order
+        ) !== order
+      ) {
+        normalizeStatements.push(
+          env.DB.prepare(`
             UPDATE tournament_matches
             SET
               play_order = ?,
               updated_at = ?
             WHERE id = ?
-              AND tournament_id = ?
-          `)
-            .bind(
-              nextPlayOrder,
-              now,
-              match.id,
-              tournamentId
-            )
-            .run();
-
-          match.play_order =
-            nextPlayOrder;
-
-          nextPlayOrder++;
-        }
+          `).bind(
+            order,
+            new Date().toISOString(),
+            match.id
+          )
+        );
       }
     }
+  );
+
+  const pendingMatches =
+    latestMatches.filter(
+      (match) =>
+        match.status ===
+          "pending" &&
+        match.play_order !==
+          null
+    );
+
+  for (
+    const match of pendingMatches
+  ) {
+    normalizeStatements.push(
+      env.DB.prepare(`
+        UPDATE tournament_matches
+        SET
+          play_order = NULL,
+          updated_at = ?
+        WHERE id = ?
+      `).bind(
+        new Date().toISOString(),
+        match.id
+      )
+    );
+  }
+
+  if (
+    normalizeStatements.length
+  ) {
+    await env.DB.batch(
+      normalizeStatements
+    );
   }
 }
 
-// ============================================================
-// 處理特殊比賽
-//
-// 1. 單淘汰決賽
-// 2. 雙敗 Grand Final
-// 3. Grand Final Reset
-// ============================================================
+async function refreshDoubleElimination(
+  env,
+  tournamentId,
+  matches
+) {
+  const active =
+    matches
+      .filter(
+        (match) =>
+          Number(
+            match.is_bye_match
+          ) !== 1 &&
+          match.status !==
+            "completed" &&
+          match.status !==
+            "void"
+      )
+      .sort(
+        (a, b) =>
+          Number(a.round) -
+            Number(b.round) ||
+          Number(a.position) -
+            Number(b.position) ||
+          Number(a.id) -
+            Number(b.id)
+      );
+
+  const now =
+    new Date().toISOString();
+
+  const updates = [];
+
+  let maxPlayOrder =
+    0;
+
+  for (const match of matches) {
+    if (
+      Number(
+        match.is_bye_match
+      ) !== 1 &&
+      match.status !==
+        "void" &&
+      match.play_order !==
+        null
+    ) {
+      maxPlayOrder =
+        Math.max(
+          maxPlayOrder,
+          Number(
+            match.play_order
+          )
+        );
+    }
+  }
+
+  for (const match of active) {
+    const shouldBeReady =
+      Boolean(
+        match.participant1_id &&
+        match.participant2_id
+      );
+
+    const nextStatus =
+      shouldBeReady
+        ? "ready"
+        : "pending";
+
+    if (
+      match.status !==
+      nextStatus
+    ) {
+      updates.push(
+        env.DB.prepare(`
+          UPDATE tournament_matches
+          SET
+            status = ?,
+            updated_at = ?
+          WHERE id = ?
+        `).bind(
+          nextStatus,
+          now,
+          match.id
+        )
+      );
+    }
+
+    if (
+      shouldBeReady
+    ) {
+      if (
+        match.play_order ===
+          null ||
+        match.play_order ===
+          undefined
+      ) {
+        maxPlayOrder += 1;
+
+        updates.push(
+          env.DB.prepare(`
+            UPDATE tournament_matches
+            SET
+              play_order = ?,
+              updated_at = ?
+            WHERE id = ?
+          `).bind(
+            maxPlayOrder,
+            now,
+            match.id
+          )
+        );
+      }
+    } else if (
+      match.play_order !==
+      null
+    ) {
+      updates.push(
+        env.DB.prepare(`
+          UPDATE tournament_matches
+          SET
+            play_order = NULL,
+            updated_at = ?
+          WHERE id = ?
+        `).bind(
+          now,
+          match.id
+        )
+      );
+    }
+  }
+
+  if (updates.length) {
+    await env.DB.batch(
+      updates
+    );
+  }
+}
 
 async function handleSpecialMatchCompletion(
   env,
@@ -1585,9 +1519,6 @@ async function handleSpecialMatchCompletion(
   const now =
     new Date().toISOString();
 
-  // ============================================================
-  // 單淘汰
-  // ============================================================
   if (
     match.bracket ===
       "winners" &&
@@ -1599,9 +1530,9 @@ async function handleSpecialMatchCompletion(
         SELECT format
         FROM tournaments
         WHERE id = ?
-      `)
-        .bind(tournamentId)
-        .first();
+      `).bind(
+        tournamentId
+      ).first();
 
     if (
       tournament?.format ===
@@ -1614,21 +1545,16 @@ async function handleSpecialMatchCompletion(
           champion_id = ?,
           updated_at = ?
         WHERE id = ?
-      `)
-        .bind(
-          winnerId,
-          now,
-          tournamentId
-        )
-        .run();
+      `).bind(
+        winnerId,
+        now,
+        tournamentId
+      ).run();
     }
 
     return;
   }
 
-  // ============================================================
-  // 雙敗 Grand Final
-  // ============================================================
   if (
     match.is_grand_final &&
     !match.is_reset_match
@@ -1637,10 +1563,6 @@ async function handleSpecialMatchCompletion(
       winnerId ===
       match.participant1_id
     ) {
-      // ========================================================
-      // 勝部側獲勝
-      // → 直接完成賽事
-      // ========================================================
       await env.DB.prepare(`
         UPDATE tournaments
         SET
@@ -1648,13 +1570,11 @@ async function handleSpecialMatchCompletion(
           champion_id = ?,
           updated_at = ?
         WHERE id = ?
-      `)
-        .bind(
-          winnerId,
-          now,
-          tournamentId
-        )
-        .run();
+      `).bind(
+        winnerId,
+        now,
+        tournamentId
+      ).run();
 
       const reset =
         await findResetMatch(
@@ -1668,20 +1588,15 @@ async function handleSpecialMatchCompletion(
           UPDATE tournament_matches
           SET
             status = 'void',
+            play_order = NULL,
             updated_at = ?
           WHERE id = ?
-        `)
-          .bind(
-            now,
-            reset.id
-          )
-          .run();
+        `).bind(
+          now,
+          reset.id
+        ).run();
       }
     } else {
-      // ========================================================
-      // 敗部側獲勝
-      // → 啟動 Reset
-      // ========================================================
       const reset =
         await findResetMatch(
           env,
@@ -1698,23 +1613,23 @@ async function handleSpecialMatchCompletion(
             status = 'ready',
             updated_at = ?
           WHERE id = ?
-        `)
-          .bind(
-            match.participant1_id,
-            match.participant2_id,
-            now,
-            reset.id
-          )
-          .run();
+        `).bind(
+          match.participant1_id,
+          match.participant2_id,
+          now,
+          reset.id
+        ).run();
+
+        await refreshReadyMatches(
+          env,
+          tournamentId
+        );
       }
     }
 
     return;
   }
 
-  // ============================================================
-  // 雙敗 Reset
-  // ============================================================
   if (
     match.is_grand_final &&
     match.is_reset_match
@@ -1726,19 +1641,13 @@ async function handleSpecialMatchCompletion(
         champion_id = ?,
         updated_at = ?
       WHERE id = ?
-    `)
-      .bind(
-        winnerId,
-        now,
-        tournamentId
-      )
-      .run();
+    `).bind(
+      winnerId,
+      now,
+      tournamentId
+    ).run();
   }
 }
-
-// ============================================================
-// 找 Grand Final Reset
-// ============================================================
 
 async function findResetMatch(
   env,
@@ -1753,21 +1662,20 @@ async function findResetMatch(
       AND is_reset_match = 1
     ORDER BY id DESC
     LIMIT 1
-  `)
-    .bind(
-      tournamentId
-    )
-    .first();
+  `).bind(
+    tournamentId
+  ).first();
 }
-
-// ============================================================
-// 取得完整賽事資料
-// ============================================================
 
 async function getTournamentDetail(
   env,
   tournamentId
 ) {
+  await refreshReadyMatches(
+    env,
+    tournamentId
+  );
+
   const tournament =
     await env.DB.prepare(`
       SELECT
@@ -1784,9 +1692,9 @@ async function getTournamentDetail(
       LEFT JOIN tournament_participants c
         ON c.id = t.champion_id
       WHERE t.id = ?
-    `)
-      .bind(tournamentId)
-      .first();
+    `).bind(
+      tournamentId
+    ).first();
 
   if (!tournament) {
     return null;
@@ -1801,9 +1709,9 @@ async function getTournamentDetail(
       FROM tournament_participants
       WHERE tournament_id = ?
       ORDER BY seed ASC
-    `)
-      .bind(tournamentId)
-      .all();
+    `).bind(
+      tournamentId
+    ).all();
 
   const matches =
     await env.DB.prepare(`
@@ -1812,69 +1720,53 @@ async function getTournamentDetail(
         m.bracket,
         m.round,
         m.position,
-        m.play_order,
-
         m.participant1_id,
         m.participant2_id,
-
         p1.name AS participant1_name,
         p2.name AS participant2_name,
-
         m.score1,
         m.score2,
         m.winner_id,
         m.status,
-
         m.is_bye_match,
         m.is_grand_final,
         m.is_reset_match,
-
+        m.play_order,
         m.next_match_id,
         m.next_match_slot,
-
         m.loser_next_match_id,
         m.loser_next_match_slot
-
       FROM tournament_matches m
-
       LEFT JOIN tournament_participants p1
-        ON p1.id = m.participant1_id
-
+        ON p1.id =
+          m.participant1_id
       LEFT JOIN tournament_participants p2
-        ON p2.id = m.participant2_id
-
+        ON p2.id =
+          m.participant2_id
       WHERE m.tournament_id = ?
-
       ORDER BY
         m.bracket ASC,
         m.round ASC,
         m.position ASC
-    `)
-      .bind(tournamentId)
-      .all();
+    `).bind(
+      tournamentId
+    ).all();
 
   return {
     tournament,
     participants:
-      participants.results ||
-      [],
+      participants.results || [],
     matches:
-      matches.results ||
-      []
+      matches.results || []
   };
 }
-
-// ============================================================
-// Fisher-Yates 洗牌
-// ============================================================
 
 function shuffle(array) {
   const result =
     [...array];
 
   for (
-    let i =
-      result.length - 1;
+    let i = result.length - 1;
     i > 0;
     i--
   ) {
