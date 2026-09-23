@@ -567,6 +567,75 @@ export default {
       });
     }
 
+        // =========================
+    // 裝置管理連結 Claim
+    // =========================
+    if (
+      url.pathname === "/api/device/claim" &&
+      request.method === "POST"
+    ) {
+      const body = await request.json();
+
+      const managementToken =
+        String(body.token || "").trim();
+
+      if (!managementToken) {
+        return jsonResponse(
+          {
+            error: "管理連結無效"
+          },
+          400
+        );
+      }
+
+      const tokenHash =
+        await hashManagementToken(
+          managementToken
+        );
+
+      const device =
+        await env.DB
+          .prepare(`
+            SELECT
+              id,
+              token_hash,
+              created_at,
+              last_seen_at
+            FROM management_devices
+            WHERE token_hash = ?
+            LIMIT 1
+          `)
+          .bind(tokenHash)
+          .first();
+
+      if (!device) {
+        return jsonResponse(
+          {
+            error: "管理連結無效或已失效"
+          },
+          401
+        );
+      }
+
+      const deviceSession =
+        await createDeviceSession(
+          env,
+          device.id
+        );
+
+      const response =
+        jsonResponse({
+          success: true
+        });
+
+      response.headers.set(
+        "Set-Cookie",
+        `${DEVICE_SESSION_COOKIE}=${deviceSession.token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${DEVICE_SESSION_MINUTES * 60}`
+      );
+
+      return response;
+    }
+    
     // =========================
     // 管理員登入
     // =========================
