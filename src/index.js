@@ -3,6 +3,9 @@ import { handleTournamentRoutes } from "./tournaments.js";
 const SESSION_COOKIE = "admin_session";
 const SESSION_MINUTES = 30;
 
+const DEVICE_SESSION_COOKIE = "device_session";
+const DEVICE_SESSION_MINUTES = 60 * 24 * 30;
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
