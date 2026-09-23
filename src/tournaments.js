@@ -50,7 +50,10 @@ export async function handleTournamentRoutes(
     const session = await requireAdmin(request, env);
 
     if (!session) {
-      return jsonResponse({ error: "未登入管理員帳號" }, 401);
+      return jsonResponse(
+        { error: "未登入管理員帳號" },
+        401
+      );
     }
 
     const body = await request.json().catch(() => ({}));
@@ -66,13 +69,21 @@ export async function handleTournamentRoutes(
       : [];
 
     if (!name) {
-      return jsonResponse({ error: "賽事名稱不能為空白" }, 400);
+      return jsonResponse(
+        { error: "賽事名稱不能為空白" },
+        400
+      );
     }
 
     if (
-      !["single_elimination", "double_elimination"].includes(format)
+      !["single_elimination", "double_elimination"].includes(
+        format
+      )
     ) {
-      return jsonResponse({ error: "賽制錯誤" }, 400);
+      return jsonResponse(
+        { error: "賽制錯誤" },
+        400
+      );
     }
 
     if (names.length < 2 || names.length > 48) {
@@ -94,10 +105,17 @@ export async function handleTournamentRoutes(
     let generated;
 
     try {
-      generated = generateBracket(seedParticipants, format);
+      generated = generateBracket(
+        seedParticipants,
+        format
+      );
     } catch (error) {
       return jsonResponse(
-        { error: error.message || "產生賽程失敗" },
+        {
+          error:
+            error.message ||
+            "產生賽程失敗"
+        },
         400
       );
     }
@@ -125,7 +143,8 @@ export async function handleTournamentRoutes(
       now
     ).run();
 
-    const tournamentId = tournamentInsert.meta.last_row_id;
+    const tournamentId =
+      tournamentInsert.meta.last_row_id;
 
     // =========================
     // 建立參賽者
@@ -148,11 +167,16 @@ export async function handleTournamentRoutes(
         now
       ).run();
 
-      seedToDbId.set(p.id, res.meta.last_row_id);
+      seedToDbId.set(
+        p.id,
+        res.meta.last_row_id
+      );
     }
 
     const resolveParticipant = (p) =>
-      p ? seedToDbId.get(p.id) || null : null;
+      p
+        ? seedToDbId.get(p.id) || null
+        : null;
 
     // =========================
     // Phase A
@@ -238,7 +262,9 @@ export async function handleTournamentRoutes(
           : null,
 
         m.loserNextMatchId
-          ? tempIdToDbId.get(m.loserNextMatchId)
+          ? tempIdToDbId.get(
+              m.loserNextMatchId
+            )
           : null,
 
         m.loserNextMatchId
@@ -255,7 +281,7 @@ export async function handleTournamentRoutes(
     // 處理「建立賽程時就已經完成」的第一輪 Bye。
     //
     // bracket-engine.js 產生 Bye 時,
-    // 該場會直接是 completed + winner_id。
+    // 該場會直接是 completed + winner。
     //
     // 但此時 next_match_id 已經建立完成,
     // 所以現在把 Bye 勝者推進下一場。
@@ -263,19 +289,23 @@ export async function handleTournamentRoutes(
     // 這就是 3、5、6、7、10、15、21... 人數
     // 能正常往下一輪晉級的關鍵。
     // ========================================================
-    const initialByeRows = await env.DB.prepare(`
-      SELECT
-        id,
-        winner_id,
-        next_match_id,
-        next_match_slot
-      FROM tournament_matches
-      WHERE tournament_id = ?
-        AND status = 'completed'
-        AND is_bye_match = 1
-        AND winner_id IS NOT NULL
-        AND next_match_id IS NOT NULL
-    `).bind(tournamentId).all();
+
+    const initialByeRows =
+      await env.DB.prepare(`
+        SELECT
+          id,
+          winner_id,
+          next_match_id,
+          next_match_slot
+        FROM tournament_matches
+        WHERE tournament_id = ?
+          AND status = 'completed'
+          AND is_bye_match = 1
+          AND winner_id IS NOT NULL
+          AND next_match_id IS NOT NULL
+      `)
+        .bind(tournamentId)
+        .all();
 
     const initialByeQueue = (
       initialByeRows.results || []
@@ -302,7 +332,9 @@ export async function handleTournamentRoutes(
   // 單一賽事詳細資料
   // =========================
   const detailMatch =
-    path.match(/^\/api\/tournaments\/(\d+)$/);
+    path.match(
+      /^\/api\/tournaments\/(\d+)$/
+    );
 
   if (
     detailMatch &&
@@ -485,9 +517,11 @@ export async function handleTournamentRoutes(
   return null;
 }
 
+
 // ============================================================
 // 完成一場比賽
 // ============================================================
+
 async function completeMatch(
   env,
   {
@@ -562,6 +596,7 @@ async function completeMatch(
   );
 }
 
+
 // ============================================================
 // 傳遞參賽者
 //
@@ -575,6 +610,7 @@ async function completeMatch(
 // slot = 1 → participant1_id
 // slot = 2 → participant2_id
 // ============================================================
+
 async function propagate(
   env,
   queue
@@ -701,6 +737,7 @@ async function propagate(
   }
 }
 
+
 // ============================================================
 // 處理特殊比賽
 //
@@ -708,6 +745,7 @@ async function propagate(
 // 2. 雙敗 Grand Final
 // 3. Grand Final Reset
 // ============================================================
+
 async function handleSpecialMatchCompletion(
   env,
   tournamentId,
@@ -863,9 +901,11 @@ async function handleSpecialMatchCompletion(
   }
 }
 
+
 // ============================================================
 // 找 Grand Final Reset
 // ============================================================
+
 async function findResetMatch(
   env,
   tournamentId,
@@ -880,15 +920,15 @@ async function findResetMatch(
     ORDER BY id DESC
     LIMIT 1
   `)
-    .bind(
-      tournamentId
-    )
+    .bind(tournamentId)
     .first();
 }
+
 
 // ============================================================
 // 取得完整賽事資料
 // ============================================================
+
 async function getTournamentDetail(
   env,
   tournamentId
@@ -986,9 +1026,11 @@ async function getTournamentDetail(
   };
 }
 
+
 // ============================================================
 // Fisher-Yates 洗牌
 // ============================================================
+
 function shuffle(array) {
   const result = [...array];
 
