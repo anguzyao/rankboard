@@ -1092,7 +1092,7 @@
     >
 
       <div class="current-title">
-        🔴 目前進行中的比賽
+        🔥 目前對戰
       </div>
 
       <div
@@ -1313,75 +1313,95 @@
   // 找目前進行中的比賽
   // ========================================================
 
-  function renderCurrentMatch(
-    matches
-  ) {
+// ========================================================
+// 找目前可以進行中的比賽
+// ========================================================
 
-    const section =
-      document.getElementById(
-        "currentMatch"
-      );
+function renderCurrentMatch(
+  matches
+) {
 
+  const section =
+    document.getElementById(
+      "currentMatch"
+    );
 
-    const players =
-      document.getElementById(
-        "currentPlayers"
-      );
+  const players =
+    document.getElementById(
+      "currentPlayers"
+    );
 
+  // ======================================================
+  // 找出目前可以進行的比賽
+  //
+  // ready：
+  // 代表兩位選手都已經產生，可以進行比賽
+  //
+  // in_progress：
+  // 如果未來系統加入「比賽進行中」狀態，也一起支援
+  // ======================================================
 
-    const match =
-      matches.find(
-        (item) =>
-          item.status ===
-            "in_progress"
-      );
+  const currentMatches =
+    matches.filter(
+      (item) =>
+        item.status === "ready" ||
+        item.status === "in_progress"
+    );
 
-
-    if (!match) {
-
-      section.classList
-        .remove("show");
-
-      return;
-
-    }
-
+  // 沒有目前對戰
+  if (!currentMatches.length) {
 
     section.classList
-      .add("show");
+      .remove("show");
 
+    players.innerHTML = "";
 
-    players.innerHTML = `
-
-      <div
-        class="current-player"
-      >
-        ${escapeHtml(
-          match.participant1_name ||
-          "尚未產生"
-        )}
-      </div>
-
-
-      <div
-        class="vs"
-      >
-        VS
-      </div>
-
-
-      <div
-        class="current-player"
-      >
-        ${escapeHtml(
-          match.participant2_name ||
-          "尚未產生"
-        )}
-      </div>
-
-    `;
+    return;
 
   }
+
+  section.classList
+    .add("show");
+
+  // ======================================================
+  // 如果同時有多場可以進行
+  // 就全部顯示
+  // ======================================================
+
+  players.innerHTML =
+    currentMatches
+      .map(
+        (match) => `
+
+          <div
+            class="current-player"
+          >
+            ${escapeHtml(
+              match.participant1_name ||
+              "尚未產生"
+            )}
+          </div>
+
+          <div
+            class="vs"
+          >
+            VS
+          </div>
+
+          <div
+            class="current-player"
+          >
+            ${escapeHtml(
+              match.participant2_name ||
+              "尚未產生"
+            )}
+          </div>
+
+        `
+      )
+      .join("");
+
+}
 
 
   // ========================================================
