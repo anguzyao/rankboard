@@ -558,8 +558,9 @@
     class="container hidden"
   >
 
-    <h1>
-      onclick="window.location.href='/'"
+    <!-- 點擊標題回到積分榜 -->
+    <h1
+      onclick="window.location.assign('/')"
       style="cursor: pointer;"
       title="回到積分榜"
     >
@@ -1107,270 +1108,275 @@ Tournament ID: ${data.tournamentId}`,
     );
 
 
- // ==========================================================
-// 載入賽事列表
-// ==========================================================
+  // ==========================================================
+  // 載入賽事列表
+  // ==========================================================
 
-async function loadTournaments() {
+  async function loadTournaments() {
 
-  const container =
-    $("tournamentList");
+    const container =
+      $("tournamentList");
 
-  try {
+    try {
 
-    const data =
-      await api(
-        "/api/tournaments"
-      );
+      const data =
+        await api(
+          "/api/tournaments"
+        );
 
-    const tournaments =
-      data.tournaments || [];
+      const tournaments =
+        data.tournaments || [];
 
-    if (!tournaments.length) {
+      if (!tournaments.length) {
+
+        container.innerHTML =
+          '<div class="muted">目前沒有賽事</div>';
+
+        return;
+      }
+
 
       container.innerHTML =
-        '<div class="muted">目前沒有賽事</div>';
+        tournaments
+          .map(
+            (tournament) => {
 
-      return;
-    }
+              const format =
+                tournament.format ===
+                "single_elimination"
+                  ? "單淘汰"
+                  : "雙敗";
 
-
-    container.innerHTML =
-      tournaments
-        .map(
-          (tournament) => {
-
-            const format =
-              tournament.format ===
-              "single_elimination"
-                ? "單淘汰"
-                : "雙敗";
-
-            const status =
-              tournament.status ===
-              "completed"
-                ? "已完成"
-                : "進行中";
+              const status =
+                tournament.status ===
+                "completed"
+                  ? "已完成"
+                  : "進行中";
 
 
-            return `
-              <div
-                class="tournament-item"
-              >
-
-                <strong>
-                  ${escapeHtml(
-                    tournament.name
-                  )}
-                </strong>
-
-
-                <div class="muted">
-
-                  ID：
-                  ${escapeHtml(
-                    String(tournament.id)
-                  )}
-
-                  　
-                  人數：
-                  ${escapeHtml(
-                    String(tournament.size || "")
-                  )}
-
-                  　
-                  賽制：
-                  ${escapeHtml(format)}
-
-                  　
-                  狀態：
-                  ${escapeHtml(status)}
-
-                </div>
-
-
-                <br>
-
-
+              return `
                 <div
-                  class="button-row"
+                  class="tournament-item"
                 >
 
-                  <button
-                    class="secondary"
-                    onclick="
-                      loadTournamentDetail(
-                        ${Number(tournament.id)}
-                      )
-                    "
+                  <strong>
+                    ${escapeHtml(
+                      tournament.name
+                    )}
+                  </strong>
+
+
+                  <div class="muted">
+
+                    ID：
+                    ${escapeHtml(
+                      String(tournament.id)
+                    )}
+
+                    　
+                    人數：
+                    ${escapeHtml(
+                      String(tournament.size || "")
+                    )}
+
+                    　
+                    賽制：
+                    ${escapeHtml(format)}
+
+                    　
+                    狀態：
+                    ${escapeHtml(status)}
+
+                  </div>
+
+
+                  <br>
+
+
+                  <div
+                    class="button-row"
                   >
-                    查看賽程資料
-                  </button>
+
+                    <button
+                      class="secondary"
+                      onclick="
+                        loadTournamentDetail(
+                          ${Number(tournament.id)}
+                        )
+                      "
+                    >
+                      查看賽程資料
+                    </button>
 
 
-                  <button
-                    class="secondary"
-                    onclick="
-                      randomizeTournament(
-                        ${Number(tournament.id)},
-                        this
-                      )
-                    "
-                  >
-                    🎲 隨機排列
-                  </button>
+                    <button
+                      class="secondary"
+                      onclick="
+                        randomizeTournament(
+                          ${Number(tournament.id)},
+                          this
+                        )
+                      "
+                    >
+                      🎲 隨機排列
+                    </button>
 
 
-                  <button
-                    class="secondary"
-                    onclick="
-                      copyPublicTournamentUrl(
-                        ${Number(tournament.id)},
-                        this
-                      )
-                    "
-                  >
-                    👁 分享公開賽程
-                  </button>
+                    <button
+                      class="secondary"
+                      onclick="
+                        copyPublicTournamentUrl(
+                          ${Number(tournament.id)},
+                          this
+                        )
+                      "
+                    >
+                      👁 分享公開賽程
+                    </button>
 
 
-                  <button
-                    class="danger"
-                    onclick="
-                      deleteTournament(
-                        ${Number(tournament.id)},
-                        '${escapeHtml(
-                          tournament.name
-                        ).replace(/'/g, "\\'")}'
-                      )
-                    "
-                  >
-                    刪除賽程
-                  </button>
+                    <button
+                      class="danger"
+                      onclick="
+                        deleteTournament(
+                          ${Number(tournament.id)},
+                          '${escapeHtml(
+                            tournament.name
+                          ).replace(/'/g, "\\'")}'
+                        )
+                      "
+                    >
+                      刪除賽程
+                    </button>
+
+                  </div>
+
 
                 </div>
+              `;
+            }
+          )
+          .join("");
 
 
-              </div>
-            `;
-          }
-        )
-        .join("");
+    } catch (error) {
 
+      container.textContent =
+        error.message;
 
-  } catch (error) {
-
-    container.textContent =
-      error.message;
+    }
 
   }
 
-}
 
+  // ==========================================================
+  // 隨機排列
+  // ==========================================================
 
-// ==========================================================
-// 開啟公開賽程
-// ==========================================================
-
-// ==========================================================
-// 複製公開賽程網址
-// ==========================================================
-
-async function randomizeTournament(
-  tournamentId,
-  button
-) {
-
-  const originalText =
-    button.textContent;
-
-  try {
-
-    button.disabled = true;
-    button.textContent =
-      "🎲 排列中...";
-
-    await api(
-      `/api/tournaments/${tournamentId}/randomize`,
-      {
-        method: "POST"
-      }
-    );
-
-    button.textContent =
-      "✅ 已重新排列";
-
-    await loadTournaments();
-    await loadTournamentDetail(
-      tournamentId
-    );
-
-    setTimeout(() => {
-      button.textContent =
-        originalText;
-    }, 1500);
-
-  } catch (error) {
-
-    console.error(
-      "隨機排列失敗：",
-      error
-    );
-
-    button.disabled = false;
-    button.textContent =
-      originalText;
-
-    alert(
-      error.message ||
-      "隨機排列失敗"
-    );
-  }
-
-}
-
-
-async function copyPublicTournamentUrl(
-  tournamentId,
-  button
-) {
-
-  const publicUrl =
-    `${window.location.origin}/tournament-view.html?id=${tournamentId}`;
-
-  try {
-
-    await navigator.clipboard.writeText(
-      publicUrl
-    );
+  async function randomizeTournament(
+    tournamentId,
+    button
+  ) {
 
     const originalText =
       button.textContent;
 
-    button.textContent =
-      "✅ 已複製網址";
+    try {
 
-    setTimeout(() => {
+      button.disabled = true;
+      button.textContent =
+        "🎲 排列中...";
+
+      await api(
+        `/api/tournaments/${tournamentId}/randomize`,
+        {
+          method: "POST"
+        }
+      );
+
+      button.textContent =
+        "✅ 已重新排列";
+
+      await loadTournaments();
+
+      await loadTournamentDetail(
+        tournamentId
+      );
+
+      setTimeout(() => {
+
+        button.textContent =
+          originalText;
+
+      }, 1500);
+
+    } catch (error) {
+
+      console.error(
+        "隨機排列失敗：",
+        error
+      );
+
+      button.disabled = false;
 
       button.textContent =
         originalText;
 
-    }, 1500);
+      alert(
+        error.message ||
+        "隨機排列失敗"
+      );
 
-  } catch (error) {
-
-    console.error(
-      "複製網址失敗：",
-      error
-    );
-
-    alert(
-      `複製失敗，請手動複製：\n\n${publicUrl}`
-    );
+    }
 
   }
 
-}
+
+  // ==========================================================
+  // 複製公開賽程網址
+  // ==========================================================
+
+  async function copyPublicTournamentUrl(
+    tournamentId,
+    button
+  ) {
+
+    const publicUrl =
+      `${window.location.origin}/tournament-view.html?id=${tournamentId}`;
+
+    try {
+
+      await navigator.clipboard.writeText(
+        publicUrl
+      );
+
+      const originalText =
+        button.textContent;
+
+      button.textContent =
+        "✅ 已複製網址";
+
+      setTimeout(() => {
+
+        button.textContent =
+          originalText;
+
+      }, 1500);
+
+    } catch (error) {
+
+      console.error(
+        "複製網址失敗：",
+        error
+      );
+
+      alert(
+        `複製失敗，請手動複製：\n\n${publicUrl}`
+      );
+
+    }
+
+  }
 
 
   // ==========================================================
@@ -2263,6 +2269,7 @@ async function copyPublicTournamentUrl(
     `;
 
   }
+
 
   // ==========================================================
   // 選擇勝者
