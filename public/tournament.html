@@ -1373,7 +1373,8 @@ Tournament ID: ${data.tournamentId}`,
                 .map(
                   (match) =>
                     renderMatchCard(
-                      match
+                      match,
+                      tournament.id
                     )
                 )
                 .join("");
@@ -1463,18 +1464,24 @@ Tournament ID: ${data.tournamentId}`,
   }
 
 
-  function renderMatchCard(match) {
+    function renderMatchCard(
+    match,
+    tournamentId
+  ) {
 
     const isBye =
       Number(match.is_bye_match) === 1;
+
 
     const participant1 =
       match.participant1_name ||
       "";
 
+
     const participant2 =
       match.participant2_name ||
       "";
+
 
     const score1 =
       match.score1 === null ||
@@ -1482,11 +1489,13 @@ Tournament ID: ${data.tournamentId}`,
         ? ""
         : match.score1;
 
+
     const score2 =
       match.score2 === null ||
       match.score2 === undefined
         ? ""
         : match.score2;
+
 
     const winnerId =
       match.winner_id === null ||
@@ -1494,11 +1503,13 @@ Tournament ID: ${data.tournamentId}`,
         ? null
         : Number(match.winner_id);
 
+
     const p1Id =
       match.participant1_id === null ||
       match.participant1_id === undefined
         ? null
         : Number(match.participant1_id);
+
 
     const p2Id =
       match.participant2_id === null ||
@@ -1506,42 +1517,74 @@ Tournament ID: ${data.tournamentId}`,
         ? null
         : Number(match.participant2_id);
 
+
     const status =
       match.status || "pending";
 
-    let statusText = "待賽";
-    let statusClass = "";
+
+    let statusText =
+      "待賽";
+
+    let statusClass =
+      "";
+
 
     if (isBye) {
-      statusText = "BYE・自動晉級";
-      statusClass = "bye-text";
+
+      statusText =
+        "BYE・自動晉級";
+
+      statusClass =
+        "bye-text";
+
     } else if (status === "ready") {
-      statusText = "可進行";
-      statusClass = "ready-text";
+
+      statusText =
+        "可進行";
+
+      statusClass =
+        "ready-text";
+
     } else if (status === "completed") {
-      statusText = "已完成";
+
+      statusText =
+        "已完成";
+
     } else if (
       participant1 &&
       participant2
     ) {
-      statusText = "待賽";
+
+      statusText =
+        "待賽";
+
     } else {
-      statusText = "等待上一輪結果";
+
+      statusText =
+        "等待上一輪結果";
+
     }
+
 
     const cardClass =
       [
         "match-card",
-        isBye ? "bye" : "",
+
+        isBye
+          ? "bye"
+          : "",
+
         status === "ready"
           ? "ready"
           : "",
+
         status === "completed"
           ? "completed"
           : ""
       ]
         .filter(Boolean)
         .join(" ");
+
 
     const p1Class =
       p1Id !== null &&
@@ -1551,6 +1594,7 @@ Tournament ID: ${data.tournamentId}`,
           ? "player-name"
           : "player-name empty";
 
+
     const p2Class =
       p2Id !== null &&
       winnerId === p2Id
@@ -1558,6 +1602,60 @@ Tournament ID: ${data.tournamentId}`,
         : participant2
           ? "player-name"
           : "player-name empty";
+
+
+    /*
+     * 只有「雙方都已經產生」、
+     * 而且不是 BYE、不是已完成的比賽，
+     * 才可以讓管理員點選勝者。
+     */
+
+    const canSelectWinner =
+      !isBye &&
+      status !== "completed" &&
+      p1Id !== null &&
+      p2Id !== null;
+
+
+    const p1Action =
+      canSelectWinner
+        ? `
+          onclick="
+            selectWinner(
+              ${Number(tournamentId)},
+              ${Number(match.id)},
+              ${Number(p1Id)},
+              '${escapeHtml(
+                participant1
+              ).replace(/'/g, "\\'")}'
+            )
+          "
+          style="
+            cursor:pointer;
+          "
+        `
+        : "";
+
+
+    const p2Action =
+      canSelectWinner
+        ? `
+          onclick="
+            selectWinner(
+              ${Number(tournamentId)},
+              ${Number(match.id)},
+              ${Number(p2Id)},
+              '${escapeHtml(
+                participant2
+              ).replace(/'/g, "\\'")}'
+            )
+          "
+          style="
+            cursor:pointer;
+          "
+        `
+        : "";
+
 
     return `
       <div
@@ -1568,55 +1666,173 @@ Tournament ID: ${data.tournamentId}`,
       >
 
         <div class="match-label">
+
           #${escapeHtml(
             String(match.id)
           )}
+
           ・
+
           場次 ${escapeHtml(
             String(match.position)
           )}
+
         </div>
 
-        <div class="player-row">
+
+        <div
+          class="player-row"
+          ${p1Action}
+        >
+
           <span class="${p1Class}">
+
             ${escapeHtml(
-              participant1 || "尚未產生"
+              participant1 ||
+              "尚未產生"
             )}
+
           </span>
 
+
           <span class="player-score">
+
             ${escapeHtml(
               String(score1)
             )}
+
           </span>
+
         </div>
 
-        <div class="player-row">
+
+        <div
+          class="player-row"
+          ${p2Action}
+        >
+
           <span class="${p2Class}">
+
             ${escapeHtml(
-              participant2 || (
+              participant2 ||
+              (
                 isBye
                   ? "BYE"
                   : "尚未產生"
               )
             )}
+
           </span>
 
+
           <span class="player-score">
+
             ${escapeHtml(
               String(score2)
             )}
+
           </span>
+
         </div>
 
-        <div class="match-status ${statusClass}">
-          ${escapeHtml(statusText)}
+
+        <div
+          class="match-status ${statusClass}"
+        >
+
+          ${escapeHtml(
+            statusText
+          )}
+
         </div>
+
+
+        ${
+          canSelectWinner
+            ? `
+              <div
+                style="
+                  padding:6px 9px 9px;
+                  color:#8cff00;
+                  font-size:11px;
+                  text-align:center;
+                  border-top:1px solid #292929;
+                "
+              >
+                點選上方選手即可晉級
+              </div>
+            `
+            : ""
+        }
 
       </div>
     `;
   }
 
+
+  // ==========================================================
+  // 選擇勝者
+  // ==========================================================
+
+  async function selectWinner(
+    tournamentId,
+    matchId,
+    winnerId,
+    winnerName
+  ) {
+
+    const confirmed =
+      confirm(
+        `確定要讓「${winnerName}」晉級嗎？\n\n` +
+        `確認後會將此選手設定為本場勝者，` +
+        `並自動推進到下一場。`
+      );
+
+
+    if (!confirmed) {
+
+      return;
+
+    }
+
+
+    try {
+
+      await api(
+        `/api/tournaments/${tournamentId}/matches/${matchId}`,
+        {
+          method: "PATCH",
+
+          body:
+            JSON.stringify({
+              winnerId
+            })
+        }
+      );
+
+
+      // 更新整個賽事畫面
+      await loadTournamentDetail(
+        tournamentId
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "設定勝者失敗：",
+        error
+      );
+
+
+      alert(
+        error.message ||
+        "設定勝者失敗"
+      );
+
+    }
+
+  }
 
   // ==========================================================
   // HTML escape
