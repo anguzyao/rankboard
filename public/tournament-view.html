@@ -753,6 +753,56 @@
     }
 
 
+    /* =====================================================
+       冠軍欄位垂直對齊最後一場
+       ===================================================== */
+
+    .champion-matches {
+
+      display:
+        grid;
+
+      grid-template-rows:
+        repeat(
+          var(--slot-count),
+          130px
+        );
+
+      position:
+        relative;
+
+    }
+
+
+    .champion-slot {
+
+      position:
+        relative;
+
+      align-self:
+        stretch;
+
+      min-width:
+        0;
+
+    }
+
+
+    .champion-slot
+    .champion-card {
+
+      position:
+        relative;
+
+      top:
+        50%;
+
+      transform:
+        translateY(-50%);
+
+    }
+
+
     .champion-title {
 
       text-align:
@@ -1945,6 +1995,67 @@ function renderMatchCard(
     };
 
 
+    // ======================================================
+    // 找最後一個正式決賽欄位
+    //
+    // 單淘汰：
+    // 第 4 輪
+    //
+    // 雙敗：
+    // Grand Final
+    //
+    // 冠軍欄位會使用這個欄位的 slotCount，
+    // 讓冠軍卡片垂直中心與最後一場完全對齊。
+    // ======================================================
+
+    let finalColumn = null;
+
+
+    if (
+      isDouble
+    ) {
+
+      finalColumn =
+        columns
+          .filter(
+            (column) =>
+              column.bracket ===
+              "grand_final"
+          )
+          .sort(
+            (a, b) =>
+              Number(b.round) -
+              Number(a.round)
+          )[0] ||
+        null;
+
+    } else {
+
+      finalColumn =
+        columns
+          .filter(
+            (column) =>
+              column.bracket ===
+              "winners"
+          )
+          .sort(
+            (a, b) =>
+              Number(b.round) -
+              Number(a.round)
+          )[0] ||
+        null;
+
+    }
+
+
+    const finalSlotCount =
+      finalColumn
+        ? Number(
+            finalColumn.slotCount
+          ) || 1
+        : 1;
+
+
     const board =
       columns
         .map(
@@ -2118,9 +2229,16 @@ function renderMatchCard(
       const finalMatches =
         matches.filter(
           (match) =>
-            match.bracket ===
-              "winners" &&
-            !match.next_match_id &&
+            (
+              match.bracket ===
+                "winners" ||
+              match.bracket ===
+                "grand_final"
+            ) &&
+            (
+              !match.next_match_id ||
+              match.is_grand_final
+            ) &&
             match.winner_id
         );
 
@@ -2194,30 +2312,52 @@ function renderMatchCard(
 
 
             <div
-              class="champion-card"
+              class="champion-matches"
+              style="
+                --slot-count:
+                  ${finalSlotCount};
+              "
             >
 
               <div
-                class="trophy"
-              >
-                🏆
-              </div>
-
-
-              <div
-                class="champion-label"
-              >
-                本屆冠軍
-              </div>
-
-
-              <div
-                class="champion-name"
+                class="champion-slot"
+                style="
+                  grid-row:
+                    1
+                    / span
+                    ${finalSlotCount};
+                "
               >
 
-                ${escapeHtml(
-                  championName
-                )}
+                <div
+                  class="champion-card"
+                >
+
+                  <div
+                    class="trophy"
+                  >
+                    🏆
+                  </div>
+
+
+                  <div
+                    class="champion-label"
+                  >
+                    本屆冠軍
+                  </div>
+
+
+                  <div
+                    class="champion-name"
+                  >
+
+                    ${escapeHtml(
+                      championName
+                    )}
+
+                  </div>
+
+                </div>
 
               </div>
 
