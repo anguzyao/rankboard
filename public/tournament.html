@@ -1207,6 +1207,19 @@ async function loadTournaments() {
                   <button
                     class="secondary"
                     onclick="
+                      randomizeTournament(
+                        ${Number(tournament.id)},
+                        this
+                      )
+                    "
+                  >
+                    🎲 隨機排列
+                  </button>
+
+
+                  <button
+                    class="secondary"
+                    onclick="
                       copyPublicTournamentUrl(
                         ${Number(tournament.id)},
                         this
@@ -1258,6 +1271,60 @@ async function loadTournaments() {
 // ==========================================================
 // 複製公開賽程網址
 // ==========================================================
+
+async function randomizeTournament(
+  tournamentId,
+  button
+) {
+
+  const originalText =
+    button.textContent;
+
+  try {
+
+    button.disabled = true;
+    button.textContent =
+      "🎲 排列中...";
+
+    await api(
+      `/api/tournaments/${tournamentId}/randomize`,
+      {
+        method: "POST"
+      }
+    );
+
+    button.textContent =
+      "✅ 已重新排列";
+
+    await loadTournaments();
+    await loadTournamentDetail(
+      tournamentId
+    );
+
+    setTimeout(() => {
+      button.textContent =
+        originalText;
+    }, 1500);
+
+  } catch (error) {
+
+    console.error(
+      "隨機排列失敗：",
+      error
+    );
+
+    button.disabled = false;
+    button.textContent =
+      originalText;
+
+    alert(
+      error.message ||
+      "隨機排列失敗"
+    );
+  }
+
+}
+
 
 async function copyPublicTournamentUrl(
   tournamentId,
@@ -1996,72 +2063,47 @@ async function copyPublicTournamentUrl(
         match.is_bye_match
       ) === 1;
 
-
     const participant1 =
       match.participant1_name ||
       "";
-
 
     const participant2 =
       match.participant2_name ||
       "";
 
-
     const score1 =
       match.score1 === null ||
       match.score1 === undefined
-
         ? ""
-
         : match.score1;
-
 
     const score2 =
       match.score2 === null ||
       match.score2 === undefined
-
         ? ""
-
         : match.score2;
-
 
     const winnerId =
       match.winner_id === null ||
       match.winner_id === undefined
-
         ? null
-
-        : Number(
-            match.winner_id
-          );
-
+        : Number(match.winner_id);
 
     const p1Id =
       match.participant1_id === null ||
       match.participant1_id === undefined
-
         ? null
-
-        : Number(
-            match.participant1_id
-          );
-
+        : Number(match.participant1_id);
 
     const p2Id =
       match.participant2_id === null ||
       match.participant2_id === undefined
-
         ? null
-
-        : Number(
-            match.participant2_id
-          );
-
+        : Number(match.participant2_id);
 
     const status =
       match.status ||
       "pending";
-
 
     let statusText =
       "待賽";
@@ -2069,310 +2111,154 @@ async function copyPublicTournamentUrl(
     let statusClass =
       "";
 
-
     if (isBye) {
-
       statusText =
         "BYE・自動晉級";
-
       statusClass =
         "bye-text";
-
-    } else if (
-      status === "ready"
-    ) {
-
+    } else if (status === "ready") {
       statusText =
         "可進行";
-
       statusClass =
         "ready-text";
-
-    } else if (
-      status === "completed"
-    ) {
-
+    } else if (status === "completed") {
       statusText =
         "已完成";
-
-    } else if (
-      participant1 &&
-      participant2
-    ) {
-
+    } else if (participant1 && participant2) {
       statusText =
         "待賽";
-
     } else {
-
       statusText =
         "等待上一輪結果";
-
     }
-
 
     const cardClass =
       [
         "match-card",
-
-        isBye
-          ? "bye"
-          : "",
-
-        status === "ready"
-          ? "ready"
-          : "",
-
-        status === "completed"
-          ? "completed"
-          : ""
-
+        isBye ? "bye" : "",
+        status === "ready" ? "ready" : "",
+        status === "completed" ? "completed" : ""
       ]
         .filter(Boolean)
         .join(" ");
 
-
     const p1Class =
-      p1Id !== null &&
-      winnerId === p1Id
-
+      p1Id !== null && winnerId === p1Id
         ? "player-name winner"
-
         : participant1
-
           ? "player-name"
-
           : "player-name empty";
-
 
     const p2Class =
-      p2Id !== null &&
-      winnerId === p2Id
-
+      p2Id !== null && winnerId === p2Id
         ? "player-name winner"
-
         : participant2
-
           ? "player-name"
-
           : "player-name empty";
-
-
-    /*
-     * 只有雙方都已產生，
-     * 且不是 BYE / 已完成，
-     * 才能點選勝者。
-     */
 
     const canSelectWinner =
       !isBye &&
-      status !== "completed" &&
+      status === "ready" &&
       p1Id !== null &&
       p2Id !== null;
 
-
     const p1Action =
       canSelectWinner
-
         ? `
           onclick="
             selectWinner(
-              ${Number(
-                tournamentId
-              )},
-              ${Number(
-                match.id
-              )},
-              ${Number(
-                p1Id
-              )},
-              '${escapeHtml(
-                participant1
-              ).replace(
-                /'/g,
-                "\\'"
-              )}'
+              ${Number(tournamentId)},
+              ${Number(match.id)},
+              ${Number(p1Id)},
+              '${escapeHtml(participant1).replace(/'/g, "\\'")}'
             )
           "
-          style="
-            cursor:pointer;
-          "
+          style="cursor:pointer;"
         `
-
         : "";
-
 
     const p2Action =
       canSelectWinner
-
         ? `
           onclick="
             selectWinner(
-              ${Number(
-                tournamentId
-              )},
-              ${Number(
-                match.id
-              )},
-              ${Number(
-                p2Id
-              )},
-              '${escapeHtml(
-                participant2
-              ).replace(
-                /'/g,
-                "\\'"
-              )}'
+              ${Number(tournamentId)},
+              ${Number(match.id)},
+              ${Number(p2Id)},
+              '${escapeHtml(participant2).replace(/'/g, "\\'")}'
             )
           "
-          style="
-            cursor:pointer;
-          "
+          style="cursor:pointer;"
         `
-
         : "";
 
+    const playOrder =
+      Number(match.play_order);
+
+    const matchLabel =
+      isBye
+        ? "BYE"
+        : Number.isFinite(playOrder) && playOrder > 0
+          ? `場次 ${playOrder}`
+          : "待安排";
 
     return `
       <div
         class="${cardClass}"
-        data-match-id="${escapeHtml(
-          String(
-            match.id
-          )
-        )}"
+        data-match-id="${escapeHtml(String(match.id))}"
       >
-
-        <div
-          class="match-label"
-        >
-
-          #${escapeHtml(
-            String(
-              match.id
-            )
-          )}
-
+        <div class="match-label">
+          #${escapeHtml(String(match.id))}
           ・
-
-          場次 ${escapeHtml(
-            String(
-              match.position
-            )
-          )}
-
+          ${escapeHtml(matchLabel)}
         </div>
 
-
-        <div
-          class="player-row"
-          ${p1Action}
-        >
-
-          <span
-            class="${p1Class}"
-          >
-
-            ${escapeHtml(
-              participant1 ||
-              "尚未產生"
-            )}
-
+        <div class="player-row" ${p1Action}>
+          <span class="${p1Class}">
+            ${escapeHtml(participant1 || "尚未產生")}
           </span>
-
-
-          <span
-            class="player-score"
-          >
-
-            ${escapeHtml(
-              String(
-                score1
-              )
-            )}
-
+          <span class="player-score">
+            ${escapeHtml(String(score1))}
           </span>
-
         </div>
 
-
-        <div
-          class="player-row"
-          ${p2Action}
-        >
-
-          <span
-            class="${p2Class}"
-          >
-
+        <div class="player-row" ${p2Action}>
+          <span class="${p2Class}">
             ${escapeHtml(
               participant2 ||
-              (
-                isBye
-                  ? "BYE"
-                  : "尚未產生"
-              )
+              (isBye ? "BYE" : "尚未產生")
             )}
-
           </span>
-
-
-          <span
-            class="player-score"
-          >
-
-            ${escapeHtml(
-              String(
-                score2
-              )
-            )}
-
+          <span class="player-score">
+            ${escapeHtml(String(score2))}
           </span>
-
         </div>
 
-
-        <div
-          class="
-            match-status
-            ${statusClass}
-          "
-        >
-
-          ${escapeHtml(
-            statusText
-          )}
-
+        <div class="match-status ${statusClass}">
+          ${escapeHtml(statusText)}
         </div>
-
 
         ${
           canSelectWinner
-
             ? `
               <div
                 style="
-                  padding:
-                    6px 9px 9px;
+                  padding:6px 9px 9px;
                   color:#8cff00;
                   font-size:11px;
                   text-align:center;
-                  border-top:
-                    1px solid #292929;
+                  border-top:1px solid #292929;
                 "
               >
                 點選上方選手即可晉級
               </div>
             `
-
             : ""
         }
-
       </div>
     `;
 
   }
-
 
   // ==========================================================
   // 選擇勝者
