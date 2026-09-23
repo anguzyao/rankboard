@@ -1468,6 +1468,136 @@ async function getParticipants(
   return results || [];
 }
 
+// ============================================================
+// 裝置管理權
+// ============================================================
+
+async function hashManagementToken(token) {
+  const data = new TextEncoder().encode(token);
+
+  const hashBuffer = await crypto.subtle.digest(
+    "SHA-256",
+    data
+  );
+
+  return Array.from(
+    new Uint8Array(hashBuffer)
+  )
+    .map((byte) =>
+      byte.toString(16).padStart(2, "0")
+    )
+    .join("");
+}
+
+
+// ============================================================
+// 取得裝置管理 Session
+// ============================================================
+
+async function getDeviceSession(request, env) {
+  const token = getCookie(
+    request,
+    DEVICE_SESSION_COOKIE
+  );
+
+  if (!token) {
+    return null;
+  }
+
+  const session = await env.DB.prepare(`
+    SELECT
+      id,
+      device_id,
+      token,
+      expires_at,
+      created_at
+    FROM device_sessions
+    WHERE token = ?
+  `)
+    .bind(token)
+    .first();
+
+  if (!session) {
+    return null;
+  }
+
+  const expiresAt = new Date(
+    session.expires_at
+  );
+
+  if (
+    expiresAt.getTime() <=
+    Date.now()
+  ) {
+    await env.DB.prepare(`
+      DELETE FROM device_sessions
+      WHERE token = ?
+    `)
+      .bind(token)
+      .run();
+
+    return null;
+  }
+
+  await env.DB.prepare(`
+    UPDATE management_devices
+    SET last_seen_at = ?
+    WHERE id = ?
+  `)
+    .bind(
+      new Date().toISOString(),
+      session.device_id
+    )
+    .run();
+
+  return session;
+}
+
+
+// ============================================================
+// 建立裝置 Session
+// ============================================================
+
+async function createDeviceSession(
+  env,
+  deviceId
+) {
+  const token =
+    crypto.randomUUID();
+
+  const now =
+    new Date();
+
+  const expiresAt =
+    new Date(
+      now.getTime() +
+      DEVICE_SESSION_MINUTES *
+        60 *
+        1000
+    );
+
+  await env.DB.prepare(`
+    INSERT INTO device_sessions (
+      device_id,
+      token,
+      expires_at,
+      created_at
+    )
+    VALUES (?, ?, ?, ?)
+  `)
+    .bind(
+      deviceId,
+      token,
+      expiresAt.toISOString(),
+      now.toISOString()
+    )
+    .run();
+
+  return {
+    token,
+    expiresAt
+  };
+}
 
 // ============================================================
 // 取得競賽
