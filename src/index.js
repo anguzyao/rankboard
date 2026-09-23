@@ -167,8 +167,19 @@ export default {
         "/api/competitions" &&
       request.method === "GET"
     ) {
+      const workspaceAuth =
+        await requireWorkspaceAdmin(
+          request,
+          env
+        );
+
       const competitions =
-        await getCompetitions(env);
+        await getCompetitions(
+          env,
+          workspaceAuth?.type === "device"
+            ? workspaceAuth.deviceId
+            : null
+        );
 
       return jsonResponse({
         competitions
@@ -191,7 +202,7 @@ export default {
       request.method === "POST"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -283,15 +294,19 @@ export default {
               name,
               sort_order,
               created_at,
-              updated_at
+              updated_at,
+              management_device_id
             )
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?)
           `)
           .bind(
             name,
             sortOrder,
             now,
-            now
+            now,
+            session.type === "device"
+              ? session.deviceId
+              : null
           )
           .run();
 
@@ -319,7 +334,12 @@ export default {
         ) === 1
       ) {
         const participants =
-          await getParticipants(env);
+          await getParticipants(
+            env,
+            session.type === "device"
+              ? session.deviceId
+              : null
+          );
 
         const statements =
           participants.map(
@@ -351,8 +371,8 @@ export default {
         }
       }
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -364,7 +384,11 @@ export default {
           sort_order:
             sortOrder,
           created_at: now,
-          updated_at: now
+          updated_at: now,
+          management_device_id:
+            session.type === "device"
+              ? session.deviceId
+              : null
         }
       });
     }
@@ -379,7 +403,7 @@ export default {
       request.method === "PATCH"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -441,6 +465,20 @@ export default {
         );
       }
 
+      if (
+        session.type === "device" &&
+        Number(competition.management_device_id) !==
+          Number(session.deviceId)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "你沒有管理這個競賽的權限"
+          },
+          403
+        );
+      }
+
       const duplicate =
         await env.DB
           .prepare(`
@@ -483,8 +521,8 @@ export default {
         )
         .run();
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -503,7 +541,7 @@ export default {
       request.method === "DELETE"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -547,6 +585,20 @@ export default {
         );
       }
 
+      if (
+        session.type === "device" &&
+        Number(competition.management_device_id) !==
+          Number(session.deviceId)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "你沒有管理這個競賽的權限"
+          },
+          403
+        );
+      }
+
       await env.DB
         .prepare(`
           DELETE FROM competitions
@@ -557,8 +609,8 @@ export default {
         )
         .run();
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -567,83 +619,87 @@ export default {
       });
     }
 
-// =========================
-// 建立管理裝置
-// =========================
-if (
-  url.pathname === "/api/device/create" &&
-  request.method === "POST"
-) {
-  const session = await requireAdmin(
-    request,
-    env
-  );
+    // =========================
+    // 建立管理裝置
+    // =========================
+    if (
+      url.pathname === "/api/device/create" &&
+      request.method === "POST"
+    ) {
+      const session =
+        await requireAdmin(
+          request,
+          env
+        );
 
-  if (!session) {
-    return jsonResponse(
-      {
-        error: "未登入管理員帳號"
-      },
-      401
-    );
-  }
+      if (!session) {
+        return jsonResponse(
+          {
+            error: "未登入管理員帳號"
+          },
+          401
+        );
+      }
 
-  const managementToken =
-    crypto.randomUUID() +
-    "-" +
-    crypto.randomUUID();
+      const managementToken =
+        crypto.randomUUID() +
+        "-" +
+        crypto.randomUUID();
 
-  const tokenHash =
-    await hashManagementToken(
-      managementToken
-    );
+      const tokenHash =
+        await hashManagementToken(
+          managementToken
+        );
 
-  const now =
-    new Date().toISOString();
+      const now =
+        new Date().toISOString();
 
-  const result =
-    await env.DB.prepare(`
-      INSERT INTO management_devices (
-        token_hash,
-        created_at,
-        last_seen_at
-      )
-      VALUES (?, ?, ?)
-    `)
-      .bind(
-        tokenHash,
-        now,
-        now
-      )
-      .run();
+      const result =
+        await env.DB.prepare(`
+          INSERT INTO management_devices (
+            token_hash,
+            created_at,
+            last_seen_at
+          )
+          VALUES (?, ?, ?)
+        `)
+        .bind(
+          tokenHash,
+          now,
+          now
+        )
+        .run();
 
-  const deviceId =
-    result.meta?.last_row_id;
+      const deviceId =
+        result.meta?.last_row_id;
 
-  const managementUrl =
-    `${url.origin}/manage?key=${encodeURIComponent(
-      managementToken
-    )}`;
+      const managementUrl =
+        `${url.origin}/manage?key=${encodeURIComponent(
+          managementToken
+        )}`;
 
-  return jsonResponse({
-    success: true,
-    device_id: deviceId,
-    management_token: managementToken,
-    management_url: managementUrl
-  });
-}
-    
-        // =========================
+      return jsonResponse({
+        success: true,
+        device_id: deviceId,
+        management_token: managementToken,
+        management_url: managementUrl
+      });
+    }
+
+    // =========================
     // 裝置管理連結 Claim
     // =========================
     if (
       url.pathname === "/api/device/claim" &&
       request.method === "POST"
     ) {
-      const body = await request.json();
+      const body =
+        await request.json();
 
       const managementToken =
-        String(body.token || "").trim();
+        String(
+          body.token || ""
+        ).trim();
 
       if (!managementToken) {
         return jsonResponse(
@@ -677,7 +733,8 @@ if (
       if (!device) {
         return jsonResponse(
           {
-            error: "管理連結無效或已失效"
+            error:
+              "管理連結無效或已失效"
           },
           401
         );
@@ -701,7 +758,7 @@ if (
 
       return response;
     }
-    
+
     // =========================
     // 管理員登入
     // =========================
@@ -798,14 +855,35 @@ if (
           .run();
       }
 
+      const deviceToken =
+        getCookie(
+          request,
+          DEVICE_SESSION_COOKIE
+        );
+
+      if (deviceToken) {
+        await env.DB
+          .prepare(`
+            DELETE FROM device_sessions
+            WHERE token = ?
+          `)
+          .bind(deviceToken)
+          .run();
+      }
+
       const response =
         jsonResponse({
           success: true
         });
 
-      response.headers.set(
+      response.headers.append(
         "Set-Cookie",
         `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
+      );
+
+      response.headers.append(
+        "Set-Cookie",
+        `${DEVICE_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
       );
 
       return response;
@@ -819,7 +897,7 @@ if (
       request.method === "GET"
     ) {
       const session =
-        await getSession(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -834,13 +912,16 @@ if (
         );
       }
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
       return jsonResponse({
-        authenticated: true
+        authenticated: true,
+        type: session.type,
+        deviceId:
+          session.deviceId ?? null
       });
     }
 
@@ -853,7 +934,7 @@ if (
       request.method === "POST"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -927,14 +1008,18 @@ if (
               name,
               score,
               created_at,
-              updated_at
+              updated_at,
+              management_device_id
             )
-            VALUES (?, 0, ?, ?)
+            VALUES (?, 0, ?, ?, ?)
           `)
           .bind(
             name,
             now,
-            now
+            now,
+            session.type === "device"
+              ? session.deviceId
+              : null
           )
           .run();
 
@@ -967,7 +1052,12 @@ if (
        * 每個競賽初始 0 分。
        */
       const competitions =
-        await getCompetitions(env);
+        await getCompetitions(
+          env,
+          session.type === "device"
+            ? session.deviceId
+            : null
+        );
 
       if (competitions.length) {
         const statements =
@@ -995,8 +1085,8 @@ if (
         );
       }
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -1015,7 +1105,7 @@ if (
       request.method === "PATCH"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -1074,6 +1164,20 @@ if (
               "找不到參賽者"
           },
           404
+        );
+      }
+
+      if (
+        session.type === "device" &&
+        Number(participant.management_device_id) !==
+          Number(session.deviceId)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "你沒有管理這位參賽者的權限"
+          },
+          403
         );
       }
 
@@ -1139,8 +1243,8 @@ if (
         )
         .run();
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -1170,7 +1274,7 @@ if (
       request.method === "PATCH"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -1218,6 +1322,20 @@ if (
               "找不到參賽者"
           },
           404
+        );
+      }
+
+      if (
+        session.type === "device" &&
+        Number(participant.management_device_id) !==
+          Number(session.deviceId)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "你沒有管理這位參賽者的權限"
+          },
+          403
         );
       }
 
@@ -1351,8 +1469,8 @@ if (
           )
       ]);
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -1372,7 +1490,7 @@ if (
       request.method === "DELETE"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -1416,6 +1534,20 @@ if (
         );
       }
 
+      if (
+        session.type === "device" &&
+        Number(participant.management_device_id) !==
+          Number(session.deviceId)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "你沒有管理這位參賽者的權限"
+          },
+          403
+        );
+      }
+
       const now =
         new Date().toISOString();
 
@@ -1449,8 +1581,8 @@ if (
           )
       ]);
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -1467,7 +1599,7 @@ if (
       request.method === "POST"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -1511,7 +1643,7 @@ if (
       request.method === "GET"
     ) {
       const session =
-        await requireAdmin(
+        await requireWorkspaceAdmin(
           request,
           env
         );
@@ -1541,14 +1673,26 @@ if (
             LEFT JOIN participants
               ON participants.id =
                 operation_logs.participant_id
+            WHERE (
+              ? IS NULL
+              OR participants.management_device_id = ?
+            )
             ORDER BY
               operation_logs.id DESC
             LIMIT 30
           `)
+          .bind(
+            session.type === "device"
+              ? session.deviceId
+              : null,
+            session.type === "device"
+              ? session.deviceId
+              : null
+          )
           .all();
 
-      await refreshSession(
-        session.token,
+      await refreshWorkspaceSession(
+        session,
         env
       );
 
@@ -1582,8 +1726,32 @@ if (
 // ============================================================
 
 async function getParticipants(
-  env
+  env,
+  managementDeviceId = null
 ) {
+  if (managementDeviceId !== null) {
+    const { results } =
+      await env.DB
+        .prepare(`
+          SELECT
+            id,
+            name,
+            score,
+            created_at,
+            updated_at,
+            management_device_id
+          FROM participants
+          WHERE management_device_id = ?
+          ORDER BY
+            score DESC,
+            id ASC
+        `)
+        .bind(managementDeviceId)
+        .all();
+
+    return results || [];
+  }
+
   const { results } =
     await env.DB
       .prepare(`
@@ -1592,7 +1760,8 @@ async function getParticipants(
           name,
           score,
           created_at,
-          updated_at
+          updated_at,
+          management_device_id
         FROM participants
         ORDER BY
           score DESC,
@@ -1603,23 +1772,30 @@ async function getParticipants(
   return results || [];
 }
 
+
 // ============================================================
 // 裝置管理權
 // ============================================================
 
 async function hashManagementToken(token) {
-  const data = new TextEncoder().encode(token);
+  const data =
+    new TextEncoder().encode(
+      token
+    );
 
-  const hashBuffer = await crypto.subtle.digest(
-    "SHA-256",
-    data
-  );
+  const hashBuffer =
+    await crypto.subtle.digest(
+      "SHA-256",
+      data
+    );
 
   return Array.from(
     new Uint8Array(hashBuffer)
   )
     .map((byte) =>
-      byte.toString(16).padStart(2, "0")
+      byte
+        .toString(16)
+        .padStart(2, "0")
     )
     .join("");
 }
@@ -1629,36 +1805,42 @@ async function hashManagementToken(token) {
 // 取得裝置管理 Session
 // ============================================================
 
-async function getDeviceSession(request, env) {
-  const token = getCookie(
-    request,
-    DEVICE_SESSION_COOKIE
-  );
+async function getDeviceSession(
+  request,
+  env
+) {
+  const token =
+    getCookie(
+      request,
+      DEVICE_SESSION_COOKIE
+    );
 
   if (!token) {
     return null;
   }
 
-  const session = await env.DB.prepare(`
-    SELECT
-      id,
-      device_id,
-      token,
-      expires_at,
-      created_at
-    FROM device_sessions
-    WHERE token = ?
-  `)
-    .bind(token)
-    .first();
+  const session =
+    await env.DB.prepare(`
+      SELECT
+        id,
+        device_id,
+        token,
+        expires_at,
+        created_at
+      FROM device_sessions
+      WHERE token = ?
+    `)
+      .bind(token)
+      .first();
 
   if (!session) {
     return null;
   }
 
-  const expiresAt = new Date(
-    session.expires_at
-  );
+  const expiresAt =
+    new Date(
+      session.expires_at
+    );
 
   if (
     expiresAt.getTime() <=
@@ -1706,9 +1888,9 @@ async function createDeviceSession(
   const expiresAt =
     new Date(
       now.getTime() +
-      DEVICE_SESSION_MINUTES *
-        60 *
-        1000
+        DEVICE_SESSION_MINUTES *
+          60 *
+          1000
     );
 
   await env.DB.prepare(`
@@ -1734,13 +1916,38 @@ async function createDeviceSession(
   };
 }
 
+
 // ============================================================
 // 取得競賽
 // ============================================================
 
 async function getCompetitions(
-  env
+  env,
+  managementDeviceId = null
 ) {
+  if (managementDeviceId !== null) {
+    const { results } =
+      await env.DB
+        .prepare(`
+          SELECT
+            id,
+            name,
+            sort_order,
+            created_at,
+            updated_at,
+            management_device_id
+          FROM competitions
+          WHERE management_device_id = ?
+          ORDER BY
+            sort_order ASC,
+            id ASC
+        `)
+        .bind(managementDeviceId)
+        .all();
+
+    return results || [];
+  }
+
   const { results } =
     await env.DB
       .prepare(`
@@ -1749,7 +1956,8 @@ async function getCompetitions(
           name,
           sort_order,
           created_at,
-          updated_at
+          updated_at,
+          management_device_id
         FROM competitions
         ORDER BY
           sort_order ASC,
@@ -1963,7 +2171,9 @@ async function updateCompetitionScore(
   const competition =
     await env.DB
       .prepare(`
-        SELECT id
+        SELECT
+          id,
+          management_device_id
         FROM competitions
         WHERE id = ?
       `)
@@ -1979,6 +2189,20 @@ async function updateCompetitionScore(
           "找不到指定競賽"
       },
       404
+    );
+  }
+
+  if (
+    session.type === "device" &&
+    Number(competition.management_device_id) !==
+      Number(session.deviceId)
+  ) {
+    return jsonResponse(
+      {
+        error:
+          "你沒有管理這個競賽的權限"
+      },
+      403
     );
   }
 
@@ -2116,8 +2340,8 @@ async function updateCompetitionScore(
       )
   ]);
 
-  await refreshSession(
-    session.token,
+  await refreshWorkspaceSession(
+    session,
     env
   );
 
@@ -2140,19 +2364,61 @@ async function undoCompetitionScore(
   const lastOperation =
     await env.DB
       .prepare(`
-        SELECT *
+        SELECT
+          operation_logs.*
         FROM operation_logs
-        WHERE action LIKE ?
-        ORDER BY id DESC
+        LEFT JOIN participants
+          ON participants.id =
+            operation_logs.participant_id
+        WHERE operation_logs.action LIKE ?
+        AND (
+          ? IS NULL
+          OR participants.management_device_id = ?
+        )
+        ORDER BY operation_logs.id DESC
         LIMIT 1
       `)
       .bind(
-        `%:${competitionId}`
+        `%:${competitionId}`,
+        session.type === "device"
+          ? session.deviceId
+          : null,
+        session.type === "device"
+          ? session.deviceId
+          : null
       )
       .all();
 
   const rows =
     lastOperation.results || [];
+
+  if (
+    session.type === "device"
+  ) {
+    const competition =
+      await env.DB
+        .prepare(`
+          SELECT management_device_id
+          FROM competitions
+          WHERE id = ?
+        `)
+        .bind(competitionId)
+        .first();
+
+    if (
+      !competition ||
+      Number(competition.management_device_id) !==
+        Number(session.deviceId)
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "你沒有管理這個競賽的權限"
+        },
+        403
+      );
+    }
+  }
 
   if (!rows.length) {
     return jsonResponse(
@@ -2239,8 +2505,8 @@ async function undoCompetitionScore(
       )
   ]);
 
-  await refreshSession(
-    session.token,
+  await refreshWorkspaceSession(
+    session,
     env
   );
 
@@ -2261,15 +2527,31 @@ async function undoLegacyScore(
   const lastOperation =
     await env.DB
       .prepare(`
-        SELECT *
+        SELECT
+          operation_logs.*
         FROM operation_logs
-        WHERE action IN (
+        LEFT JOIN participants
+          ON participants.id =
+            operation_logs.participant_id
+        WHERE operation_logs.action IN (
           'SET_SCORE',
           'ADJUST_SCORE'
         )
-        ORDER BY id DESC
+        AND (
+          ? IS NULL
+          OR participants.management_device_id = ?
+        )
+        ORDER BY operation_logs.id DESC
         LIMIT 1
       `)
+      .bind(
+        session.type === "device"
+          ? session.deviceId
+          : null,
+        session.type === "device"
+          ? session.deviceId
+          : null
+      )
       .first();
 
   if (!lastOperation) {
@@ -2341,8 +2623,8 @@ async function undoLegacyScore(
       )
   ]);
 
-  await refreshSession(
-    session.token,
+  await refreshWorkspaceSession(
+    session,
     env
   );
 
@@ -2483,6 +2765,10 @@ async function getSession(
 
 // ============================================================
 // 管理員驗證
+//
+// 僅限真正的 ADMIN_PASSWORD Session。
+// 賽程安排器目前仍使用這個驗證，
+// 所以裝置 Session 不會因此取得所有賽程權限。
 // ============================================================
 
 async function requireAdmin(
@@ -2494,6 +2780,7 @@ async function requireAdmin(
     env
   );
 }
+
 
 // ============================================================
 // 工作區管理驗證
@@ -2525,8 +2812,8 @@ async function requireWorkspaceAdmin(
 
   if (adminSession) {
     return {
+      ...adminSession,
       type: "admin",
-      session: adminSession,
       deviceId: null
     };
   }
@@ -2547,13 +2834,14 @@ async function requireWorkspaceAdmin(
   }
 
   return {
+    ...deviceSession,
     type: "device",
-    session: deviceSession,
     deviceId: Number(
       deviceSession.device_id
     )
   };
 }
+
 
 // ============================================================
 // 延長工作區 Session
@@ -2581,7 +2869,7 @@ async function refreshWorkspaceSession(
     auth.type === "admin"
   ) {
     await refreshSession(
-      auth.session.token,
+      auth.token,
       env
     );
 
@@ -2608,6 +2896,7 @@ async function refreshWorkspaceSession(
       .run();
   }
 }
+
 
 // ============================================================
 // 延長 Session
