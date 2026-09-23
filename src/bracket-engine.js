@@ -628,115 +628,130 @@ function propagateInitialByes(
   matches
 ) {
 
-  let changed =
-    true;
+  // BYE 只會在第一輪的實際空缺產生。
+  //
+  // 例如 6 人：
+  //
+  // R1
+  // 1 vs BYE
+  // 4 vs 5
+  // 2 vs BYE
+  // 3 vs 6
+  //
+  // R2 必須是：
+  //
+  // 1 vs 等待 4/5
+  // 2 vs 等待 3/6
+  //
+  // 不能因為 R2 目前只有一個已知選手，
+  // 就把 R2 判定成 BYE。
+  //
+  // 所以：
+  // 第一輪 BYE → 可以直接把勝者送到下一輪。
+  // 後續輪次只有一位選手 → 必須保持 pending。
+  //
+  // ----------------------------------------------------------
 
-
-  while (
-    changed
+  for (
+    const match of matches
   ) {
 
-    changed =
-      false;
-
-
-    for (
-      const match of matches
+    // 只處理「第一輪的 BYE」
+    if (
+      match.round !== 1 ||
+      !match.isByeMatch ||
+      match.status !== "completed" ||
+      !match.winner ||
+      !match.nextMatchId
     ) {
 
-      if (
-        !match.isByeMatch ||
-        match.status !==
-          "completed" ||
-        !match.winner ||
-        !match.nextMatchId
-      ) {
+      continue;
 
-        continue;
-
-      }
+    }
 
 
-      const target =
-        matches.find(
-          (item) =>
-            item.id ===
-            match.nextMatchId
-        );
+    const nextMatch =
+      matches.find(
+        (item) =>
+          item.id ===
+          match.nextMatchId
+      );
 
 
-      if (!target) {
+    if (!nextMatch) {
 
-        continue;
+      continue;
 
-      }
-
-
-      if (
-        match.nextMatchSlot === 1 &&
-        !target.participant1
-      ) {
-
-        target.participant1 =
-          match.winner;
-
-        changed =
-          true;
-
-      }
+    }
 
 
-      if (
-        match.nextMatchSlot === 2 &&
-        !target.participant2
-      ) {
+    // ----------------------------------------------------------
+    // 把 BYE 勝者送進下一輪
+    // ----------------------------------------------------------
 
-        target.participant2 =
-          match.winner;
+    if (
+      match.nextMatchSlot === 1
+    ) {
 
-        changed =
-          true;
+      nextMatch.participant1 =
+        nextMatch.participant1 ||
+        match.winner;
 
-      }
+    } else {
+
+      nextMatch.participant2 =
+        nextMatch.participant2 ||
+        match.winner;
+
+    }
 
 
-      const p1 =
-        target.participant1;
+    // ----------------------------------------------------------
+    // 判斷下一輪狀態
+    // ----------------------------------------------------------
+
+    const p1 =
+      nextMatch.participant1;
+
+    const p2 =
+      nextMatch.participant2;
 
 
-      const p2 =
-        target.participant2;
+    if (
+      p1 &&
+      p2
+    ) {
 
+      // 兩邊都有選手
+      // → 可以開始比賽
 
-      if (
-        p1 &&
-        p2
-      ) {
+      nextMatch.status =
+        "ready";
 
-        if (
-          !target.isByeMatch
-        ) {
+      nextMatch.isByeMatch =
+        false;
 
-          target.status =
-            "ready";
+      nextMatch.winner =
+        null;
 
-        }
+    } else {
 
-      } else if (
-        p1 ||
-        p2
-      ) {
+      // 只有一邊有選手
+      //
+      // 注意：
+      // 這不是 BYE！
+      //
+      // 另一邊可能正在等待上一場
+      // 正常比賽的勝者。
 
-        target.isByeMatch =
-          true;
+      nextMatch.status =
+        "pending";
 
-        target.status =
-          "completed";
+      nextMatch.isByeMatch =
+        false;
 
-        target.winner =
-          p1 || p2;
-
-      }
+      nextMatch.winner =
+        null;
 
     }
 
