@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+
+  <title>Corner X 賽程安排器</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #111;
+      color: #eee;
+      font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Noto Sans TC",
+        sans-serif;
+    }
+
+    .container {
+      width: min(100% - 32px, 900px);
+      margin: 0 auto;
+      padding: 32px 0 60px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 30px;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      color: #999;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 18px;
+    }
+
+    .card h2 {
+      margin: 0 0 18px;
+      font-size: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #bbb;
+      font-size: 14px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #444;
+      background: #0f0f0f;
+      color: #fff;
+      border-radius: 9px;
+      padding: 12px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: #8cff00;
+    }
+
+    textarea {
+      min-height: 260px;
+      resize: vertical;
+      line-height: 1.6;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 9px;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: #8cff00;
+      color: #111;
+    }
+
+    .secondary {
+      background: #333;
+      color: #fff;
+    }
+
+    .danger {
+      background: #d93636;
+      color: #fff;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 8px;
+      background: #111;
+      border: 1px solid #333;
+      white-space: pre-wrap;
+    }
+
+    .success {
+      border-color: #8cff00;
+      color: #bfff66;
+    }
+
+    .error {
+      border-color: #d93636;
+      color: #ff7777;
+    }
+
+    .tournament-item {
+      border: 1px solid #333;
+      background: #111;
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .tournament-item strong {
+      display: block;
+      font-size: 17px;
+      margin-bottom: 5px;
+    }
+
+    .muted {
+      color: #888;
+      font-size: 13px;
+    }
+
+    pre {
+      background: #0b0b0b;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 16px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #ddd;
+    }
+
+    .login-box {
+      max-width: 420px;
+      margin: 80px auto;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        width: min(100% - 20px, 900px);
+        padding-top: 20px;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      h1 {
+        font-size: 25px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ======================================================
+       登入
+  ======================================================= -->
+
+  <div
+    id="loginScreen"
+    class="login-box"
+  >
+    <div class="card">
+
+      <h1>Corner X</h1>
+
+      <div class="subtitle">
+        賽程安排器
+      </div>
+
+      <div class="field">
+
+        <label>
+          管理員密碼
+        </label>
+
+        <input
+          id="password"
+          type="password"
+          placeholder="輸入管理員密碼"
+        />
+
+      </div>
+
+      <button
+        id="loginButton"
+        class="primary"
+      >
+        登入
+      </button>
+
+      <div
+        id="loginStatus"
+        class="status hidden"
+      ></div>
+
+    </div>
+  </div>
+
+
+  <!-- ======================================================
+       管理介面
+  ======================================================= -->
+
+  <main
+    id="app"
+    class="container hidden"
+  >
+
+    <h1>
+      Corner X 賽程安排器
+    </h1>
+
+    <div class="subtitle">
+      目前為功能測試版
+    </div>
+
+
+    <!-- ====================================================
+         建立賽事
+    ===================================================== -->
+
+    <section class="card">
+
+      <h2>
+        建立新賽事
+      </h2>
+
+      <div class="field">
+
+        <label>
+          賽事名稱
+        </label>
+
+        <input
+          id="tournamentName"
+          type="text"
+          placeholder="例如：第二屆渣男陀螺盃"
+        />
+
+      </div>
+
+
+      <div class="row">
+
+        <div class="field">
+
+          <label>
+            賽制
+          </label>
+
+          <select id="format">
+
+            <option value="single_elimination">
+              單淘汰
+            </option>
+
+            <option value="double_elimination">
+              雙敗
+            </option>
+
+          </select>
+
+        </div>
+
+
+        <div class="field">
+
+          <label>
+            排序
+          </label>
+
+          <select id="randomize">
+
+            <option value="false">
+              保持輸入順序
+            </option>
+
+            <option value="true">
+              隨機洗牌
+            </option>
+
+          </select>
+
+        </div>
+
+      </div>
+
+
+      <div class="field">
+
+        <label>
+          參賽者
+          <span class="muted">
+            一行一位，2～48 人
+          </span>
+        </label>
+
+        <textarea
+          id="participants"
+          placeholder="Angus
+小明
+小華
+阿杰
+阿倫
+阿凱
+阿翔
+阿偉"
+        ></textarea>
+
+      </div>
+
+
+      <div class="button-row">
+
+        <button
+          id="createButton"
+          class="primary"
+        >
+          建立賽事
+        </button>
+
+        <button
+          id="logoutButton"
+          class="secondary"
+        >
+          登出
+        </button>
+
+      </div>
+
+
+      <div
+        id="createStatus"
+        class="status hidden"
+      ></div>
+
+    </section>
+
+
+    <!-- ====================================================
+         現有賽事
+    ===================================================== -->
+
+    <section class="card">
+
+      <h2>
+        現有賽事
+      </h2>
+
+      <div id="tournamentList">
+        載入中...
+      </div>
+
+    </section>
+
+
+    <!-- ====================================================
+         賽事資料
+    ===================================================== -->
+
+    <section class="card">
+
+      <h2>
+        賽事詳細資料
+      </h2>
+
+      <pre id="detailOutput">尚未選擇賽事</pre>
+
+    </section>
+
+  </main>
+
+
+<script>
+
+  // ==========================================================
+  // 基本工具
+  // ==========================================================
+
+  const $ = (id) =>
+    document.getElementById(id);
+
+
+  function showStatus(
+    element,
+    message,
+    type = ""
+  ) {
+    element.textContent = message;
+
+    element.className =
+      "status " +
+      type;
+  }
+
+
+  // ==========================================================
+  // API
+  // ==========================================================
+
+  async function api(
+    url,
+    options = {}
+  ) {
+    const response =
+      await fetch(
+        url,
+        {
+          credentials: "same-origin",
+          ...options,
+          headers: {
+            "Content-Type":
+              "application/json",
+            ...(options.headers || {})
+          }
+        }
+      );
+
+    let data = null;
+
+    try {
+      data =
+        await response.json();
+    } catch {
+      data = {};
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+        `HTTP ${response.status}`
+      );
+    }
+
+    return data;
+  }
+
+
+  // ==========================================================
+  // 檢查登入
+  // ==========================================================
+
+  async function checkLogin() {
+
+    try {
+
+      const data =
+        await api(
+          "/api/me"
+        );
+
+      if (
+        data.authenticated
+      ) {
+        showApp();
+      } else {
+        showLogin();
+      }
+
+    } catch {
+
+      showLogin();
+
+    }
+  }
+
+
+  function showLogin() {
+
+    $("loginScreen")
+      .classList
+      .remove("hidden");
+
+    $("app")
+      .classList
+      .add("hidden");
+  }
+
+
+  function showApp() {
+
+    $("loginScreen")
+      .classList
+      .add("hidden");
+
+    $("app")
+      .classList
+      .remove("hidden");
+
+    loadTournaments();
+  }
+
+
+  // ==========================================================
+  // 登入
+  // ==========================================================
+
+  $("loginButton")
+    .addEventListener(
+      "click",
+      async () => {
+
+        const password =
+          $("password").value;
+
+        if (!password) {
+          showStatus(
+            $("loginStatus"),
+            "請輸入管理員密碼",
+            "error"
+          );
+          return;
+        }
+
+        try {
+
+          $("loginButton")
+            .disabled = true;
+
+          await api(
+            "/api/login",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  password
+                })
+            }
+          );
+
+          showApp();
+
+        } catch (error) {
+
+          showStatus(
+            $("loginStatus"),
+            error.message,
+            "error"
+          );
+
+        } finally {
+
+          $("loginButton")
+            .disabled = false;
+
+        }
+
+      }
+    );
+
+
+  // Enter 登入
+  $("password")
+    .addEventListener(
+      "keydown",
+      (event) => {
+
+        if (
+          event.key === "Enter"
+        ) {
+          $("loginButton")
+            .click();
+        }
+
+      }
+    );
+
+
+  // ==========================================================
+  // 登出
+  // ==========================================================
+
+  $("logoutButton")
+    .addEventListener(
+      "click",
+      async () => {
+
+        try {
+
+          await api(
+            "/api/logout",
+            {
+              method: "POST"
+            }
+          );
+
+        } finally {
+
+          showLogin();
+
+        }
+
+      }
+    );
+
+
+  // ==========================================================
+  // 建立賽事
+  // ==========================================================
+
+  $("createButton")
+    .addEventListener(
+      "click",
+      async () => {
+
+        const name =
+          $("tournamentName")
+            .value
+            .trim();
+
+        const format =
+          $("format").value;
+
+        const randomize =
+          $("randomize").value ===
+          "true";
+
+        const participants =
+          $("participants")
+            .value
+            .split(/\r?\n/)
+            .map(
+              (name) =>
+                name.trim()
+            )
+            .filter(Boolean);
+
+        if (!name) {
+
+          showStatus(
+            $("createStatus"),
+            "請輸入賽事名稱",
+            "error"
+          );
+
+          return;
+        }
+
+        if (
+          participants.length < 2 ||
+          participants.length > 48
+        ) {
+
+          showStatus(
+            $("createStatus"),
+            "參賽人數必須是 2～48 人",
+            "error"
+          );
+
+          return;
+        }
+
+
+        try {
+
+          $("createButton")
+            .disabled = true;
+
+          showStatus(
+            $("createStatus"),
+            "正在建立賽程..."
+          );
+
+
+          const data =
+            await api(
+              "/api/tournaments",
+              {
+                method: "POST",
+
+                body:
+                  JSON.stringify({
+                    name,
+                    format,
+                    randomize,
+                    participants
+                  })
+              }
+            );
+
+
+          showStatus(
+            $("createStatus"),
+            `賽事建立成功！
+
+Tournament ID: ${data.tournamentId}`,
+            "success"
+          );
+
+
+          await loadTournaments();
+
+          await loadTournamentDetail(
+            data.tournamentId
+          );
+
+
+        } catch (error) {
+
+          showStatus(
+            $("createStatus"),
+            error.message,
+            "error"
+          );
+
+        } finally {
+
+          $("createButton")
+            .disabled = false;
+
+        }
+
+      }
+    );
+
+
+  // ==========================================================
+  // 載入賽事列表
+  // ==========================================================
+
+  async function loadTournaments() {
+
+    const container =
+      $("tournamentList");
+
+    try {
+
+      const data =
+        await api(
+          "/api/tournaments"
+        );
+
+      const tournaments =
+        data.tournaments || [];
+
+      if (!tournaments.length) {
+
+        container.innerHTML =
+          '<div class="muted">目前沒有賽事</div>';
+
+        return;
+      }
+
+
+      container.innerHTML =
+        tournaments
+          .map(
+            (tournament) => {
+
+              const format =
+                tournament.format ===
+                "single_elimination"
+                  ? "單淘汰"
+                  : "雙敗";
+
+              const status =
+                tournament.status ===
+                "completed"
+                  ? "已完成"
+                  : "進行中";
+
+              return `
+                <div
+                  class="tournament-item"
+                >
+
+                  <strong>
+                    ${escapeHtml(
+                      tournament.name
+                    )}
+                  </strong>
+
+                  <div class="muted">
+                    ID：
+                    ${tournament.id}
+                   　
+                    人數：
+                    ${tournament.size}
+                   　
+                    賽制：
+                    ${format}
+                   　
+                    狀態：
+                    ${status}
+                  </div>
+
+                  <br>
+
+                  <button
+                    class="secondary"
+                    onclick="loadTournamentDetail(${tournament.id})"
+                  >
+                    查看賽程資料
+                  </button>
+
+                </div>
+              `;
+            }
+          )
+          .join("");
+
+    } catch (error) {
+
+      container.textContent =
+        error.message;
+
+    }
+  }
+
+
+  // ==========================================================
+  // 取得單一賽事
+  // ==========================================================
+
+  async function loadTournamentDetail(
+    tournamentId
+  ) {
+
+    try {
+
+      const data =
+        await api(
+          `/api/tournaments/${tournamentId}`
+        );
+
+      $("detailOutput")
+        .textContent =
+        JSON.stringify(
+          data,
+          null,
+          2
+        );
+
+    } catch (error) {
+
+      $("detailOutput")
+        .textContent =
+        error.message;
+
+    }
+  }
+
+
+  // ==========================================================
+  // HTML escape
+  // ==========================================================
+
+  function escapeHtml(
+    value
+  ) {
+
+    return String(value)
+      .replace(
+        /&/g,
+        "&amp;"
+      )
+      .replace(
+        /</g,
+        "&lt;"
+      )
+      .replace(
+        />/g,
+        "&gt;"
+      )
+      .replace(
+        /"/g,
+        "&quot;"
+      )
+      .replace(
+        /'/g,
+        "&#039;"
+      );
+
+  }
+
+
+  // ==========================================================
+  // 啟動
+  // ==========================================================
+
+  checkLogin();
+
+</script>
+
+</body>
+</html>
