@@ -1103,149 +1103,170 @@ Tournament ID: ${data.tournamentId}`,
     );
 
 
-  // ==========================================================
-  // 載入賽事列表
-  // ==========================================================
+ // ==========================================================
+// 載入賽事列表
+// ==========================================================
 
-  async function loadTournaments() {
+async function loadTournaments() {
 
-    const container =
-      $("tournamentList");
+  const container =
+    $("tournamentList");
 
-    try {
+  try {
 
-      const data =
-        await api(
-          "/api/tournaments"
-        );
+    const data =
+      await api(
+        "/api/tournaments"
+      );
 
-      const tournaments =
-        data.tournaments || [];
+    const tournaments =
+      data.tournaments || [];
 
-      if (!tournaments.length) {
-
-        container.innerHTML =
-          '<div class="muted">目前沒有賽事</div>';
-
-        return;
-
-      }
+    if (!tournaments.length) {
 
       container.innerHTML =
-        tournaments
-          .map(
-            (tournament) => {
+        '<div class="muted">目前沒有賽事</div>';
 
-              const format =
-                tournament.format ===
-                "single_elimination"
-                  ? "單淘汰"
-                  : "雙敗";
-
-              const status =
-                tournament.status ===
-                "completed"
-                  ? "已完成"
-                  : "進行中";
-
-              return `
-                <div
-                  class="tournament-item"
-                >
-
-                  <strong>
-                    ${escapeHtml(
-                      tournament.name
-                    )}
-                  </strong>
-
-                  <div class="muted">
-
-                    ID：
-                    ${escapeHtml(
-                      String(tournament.id)
-                    )}
-
-                   　
-
-                    人數：
-                    ${escapeHtml(
-                      String(
-                        tournament.size || ""
-                      )
-                    )}
-
-                   　
-
-                    賽制：
-                    ${escapeHtml(
-                      format
-                    )}
-
-                   　
-
-                    狀態：
-                    ${escapeHtml(
-                      status
-                    )}
-
-                  </div>
-
-                  <br>
-
-                  <div
-                    class="button-row"
-                  >
-
-                    <button
-                      class="secondary"
-                      onclick="
-                        loadTournamentDetail(
-                          ${Number(
-                            tournament.id
-                          )}
-                        )
-                      "
-                    >
-                      查看賽程資料
-                    </button>
-
-                    <button
-                      class="danger"
-                      onclick="
-                        deleteTournament(
-                          ${Number(
-                            tournament.id
-                          )},
-                          '${escapeHtml(
-                            tournament.name
-                          ).replace(
-                            /'/g,
-                            "\\'"
-                          )}'
-                        )
-                      "
-                    >
-                      刪除賽程
-                    </button>
-
-                  </div>
-
-                </div>
-              `;
-
-            }
-          )
-          .join("");
-
-    } catch (error) {
-
-      container.textContent =
-        error.message;
-
+      return;
     }
 
+
+    container.innerHTML =
+      tournaments
+        .map(
+          (tournament) => {
+
+            const format =
+              tournament.format ===
+              "single_elimination"
+                ? "單淘汰"
+                : "雙敗";
+
+            const status =
+              tournament.status ===
+              "completed"
+                ? "已完成"
+                : "進行中";
+
+
+            return `
+              <div
+                class="tournament-item"
+              >
+
+                <strong>
+                  ${escapeHtml(
+                    tournament.name
+                  )}
+                </strong>
+
+
+                <div class="muted">
+
+                  ID：
+                  ${escapeHtml(
+                    String(tournament.id)
+                  )}
+
+                  　
+                  人數：
+                  ${escapeHtml(
+                    String(tournament.size || "")
+                  )}
+
+                  　
+                  賽制：
+                  ${escapeHtml(format)}
+
+                  　
+                  狀態：
+                  ${escapeHtml(status)}
+
+                </div>
+
+
+                <br>
+
+
+                <div
+                  class="button-row"
+                >
+
+                  <button
+                    class="secondary"
+                    onclick="
+                      loadTournamentDetail(
+                        ${Number(tournament.id)}
+                      )
+                    "
+                  >
+                    查看賽程資料
+                  </button>
+
+
+                  <button
+                    class="secondary"
+                    onclick="
+                      openPublicTournament(
+                        ${Number(tournament.id)}
+                      )
+                    "
+                  >
+                    👁 公開賽程
+                  </button>
+
+
+                  <button
+                    class="danger"
+                    onclick="
+                      deleteTournament(
+                        ${Number(tournament.id)},
+                        '${escapeHtml(
+                          tournament.name
+                        ).replace(/'/g, "\\'")}'
+                      )
+                    "
+                  >
+                    刪除賽程
+                  </button>
+
+                </div>
+
+
+              </div>
+            `;
+          }
+        )
+        .join("");
+
+
+  } catch (error) {
+
+    container.textContent =
+      error.message;
+
   }
+
+}
+
+
+// ==========================================================
+// 開啟公開賽程
+// ==========================================================
+
+function openPublicTournament(
+  tournamentId
+) {
+
+  const publicUrl =
+    `/tournament-view.html?id=${tournamentId}`;
+
+  window.open(
+    publicUrl,
+    "_blank"
+  );
+
+}
 
 
   // ==========================================================
