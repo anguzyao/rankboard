@@ -567,6 +567,72 @@ export default {
       });
     }
 
+// =========================
+// 建立管理裝置
+// =========================
+if (
+  url.pathname === "/api/device/create" &&
+  request.method === "POST"
+) {
+  const session = await requireAdmin(
+    request,
+    env
+  );
+
+  if (!session) {
+    return jsonResponse(
+      {
+        error: "未登入管理員帳號"
+      },
+      401
+    );
+  }
+
+  const managementToken =
+    crypto.randomUUID() +
+    "-" +
+    crypto.randomUUID();
+
+  const tokenHash =
+    await hashManagementToken(
+      managementToken
+    );
+
+  const now =
+    new Date().toISOString();
+
+  const result =
+    await env.DB.prepare(`
+      INSERT INTO management_devices (
+        token_hash,
+        created_at,
+        last_seen_at
+      )
+      VALUES (?, ?, ?)
+    `)
+      .bind(
+        tokenHash,
+        now,
+        now
+      )
+      .run();
+
+  const deviceId =
+    result.meta?.last_row_id;
+
+  const managementUrl =
+    `${url.origin}/manage?key=${encodeURIComponent(
+      managementToken
+    )}`;
+
+  return jsonResponse({
+    success: true,
+    device_id: deviceId,
+    management_token: managementToken,
+    management_url: managementUrl
+  });
+}
+    
         // =========================
     // 裝置管理連結 Claim
     // =========================
