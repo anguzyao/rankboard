@@ -18,7 +18,7 @@ export default {
         request,
         env,
         url,
-        requireAdmin,
+        requireWorkspaceAdmin,
         jsonResponse
       );
 
