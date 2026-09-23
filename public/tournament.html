@@ -2208,140 +2208,63 @@ async function copyPublicTournamentUrl(
 
   function drawBracketLines(matches) {
 
-    const board =
-      document.querySelector(".bracket-board");
+    const board = document.querySelector(".bracket-board");
+    const svg = board?.querySelector(".bracket-lines");
 
-    const svg =
-      board?.querySelector(".bracket-lines");
+    if (!board || !svg) return;
 
-    if (!board || !svg) {
-      return;
-    }
+    const boardRect = board.getBoundingClientRect();
+    const width = Math.max(board.scrollWidth, boardRect.width);
+    const height = Math.max(board.scrollHeight, boardRect.height);
 
-    const boardRect =
-      board.getBoundingClientRect();
-
-    const width =
-      Math.max(
-        board.scrollWidth,
-        boardRect.width
-      );
-
-    const height =
-      Math.max(
-        board.scrollHeight,
-        boardRect.height
-      );
-
-    svg.setAttribute(
-      "viewBox",
-      `0 0 ${width} ${height}`
-    );
-
-    svg.setAttribute(
-      "width",
-      String(width)
-    );
-
-    svg.setAttribute(
-      "height",
-      String(height)
-    );
-
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
     svg.innerHTML = "";
 
-    const matchMap =
-      new Map(
-        matches.map((match) => [
-          Number(match.id),
-          match
-        ])
-      );
+    const matchMap = new Map(
+      matches.map((match) => [Number(match.id), match])
+    );
 
     function getCenter(element, side) {
-      if (!element) {
-        return null;
-      }
-
-      const rect =
-        element.getBoundingClientRect();
-
-      const y =
-        rect.top -
-        boardRect.top +
-        rect.height / 2;
-
-      const x =
-        side === "right"
-          ? rect.right - boardRect.left
-          : rect.left - boardRect.left;
-
-      return { x, y };
+      if (!element) return null;
+      const rect = element.getBoundingClientRect();
+      return {
+        x:
+          side === "right"
+            ? rect.right - boardRect.left
+            : rect.left - boardRect.left,
+        y:
+          rect.top - boardRect.top + rect.height / 2
+      };
     }
 
-    function addPath(source, target, active) {
-      if (!source || !target) {
-        return;
-      }
-
-      const start =
-        getCenter(source, "right");
-
-      const end =
-        getCenter(target, "left");
-
-      if (!start || !end) {
-        return;
-      }
-
-      const midX =
-        start.x +
-        Math.max(18, (end.x - start.x) / 2);
-
-      const path =
-        document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "path"
-        );
-
+    function drawPath(d, active) {
+      const path = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "path"
+      );
       path.setAttribute(
         "class",
-        active
-          ? "bracket-line active"
-          : "bracket-line"
+        active ? "bracket-line active" : "bracket-line"
       );
-
-      path.setAttribute(
-        "d",
-        [
-          `M ${start.x} ${start.y}`,
-          `H ${midX}`,
-          `V ${end.y}`,
-          `H ${end.x}`
-        ].join(" ")
-      );
-
+      path.setAttribute("d", d);
       svg.appendChild(path);
     }
 
+    /*
+     * 每一個目標比賽只建立一次匯流線。
+     * 兩個來源進入同一場時：
+     *
+     *   ─────┐
+     *        │
+     *   ─────┘─────
+     *
+     * 不再讓兩條 H-V-H 路徑彼此重疊。
+     */
+    const connections = new Map();
+
     for (const match of matches) {
-
-      const sourceSlot =
-        board.querySelector(
-          `.match-slot[data-match-id="${Number(match.id)}"]`
-        );
-
-      if (!sourceSlot) {
-        continue;
-      }
-
-      const sourceCard =
-        sourceSlot.querySelector(".match-card");
-
-      if (!sourceCard) {
-        continue;
-      }
-
       const targetIds = new Set();
 
       if (match.next_match_id) {
@@ -2353,86 +2276,130 @@ async function copyPublicTournamentUrl(
       }
 
       for (const targetId of targetIds) {
+        if (!matchMap.has(targetId)) continue;
 
-        const targetMatch =
-          matchMap.get(targetId);
-
-        if (!targetMatch) {
-          continue;
+        if (!connections.has(targetId)) {
+          connections.set(targetId, []);
         }
 
-        const targetSlot =
-          board.querySelector(
-            `.match-slot[data-match-id="${targetId}"]`
-          );
-
-        if (!targetSlot) {
-          continue;
-        }
-
-        const targetCard =
-          targetSlot.querySelector(".match-card");
-
-        if (!targetCard) {
-          continue;
-        }
-
-        const active =
-          match.status === "ready" ||
-          match.status === "in_progress" ||
-          targetMatch.status === "ready" ||
-          targetMatch.status === "in_progress";
-
-        addPath(
-          sourceCard,
-          targetCard,
-          active
-        );
+        connections.get(targetId).push(match);
       }
     }
 
-    const finalMatches =
-      matches.filter(
-        (match) =>
-          (
-            match.bracket === "winners" ||
-            match.bracket === "grand_final"
-          ) &&
-          (
-            !match.next_match_id ||
-            match.is_grand_final
-          )
+    for (const [targetId, sourceMatches] of connections) {
+      const targetMatch = matchMap.get(targetId);
+      const targetSlot = board.querySelector(
+        `.match-slot[data-match-id="${targetId}"]`
+      );
+      const targetCard = targetSlot?.querySelector(".match-card");
+      const target = getCenter(targetCard, "left");
+
+      if (!target) continue;
+
+      const sources = [];
+
+      for (const sourceMatch of sourceMatches) {
+        const sourceSlot = board.querySelector(
+          `.match-slot[data-match-id="${Number(sourceMatch.id)}"]`
+        );
+        const sourceCard = sourceSlot?.querySelector(".match-card");
+        const source = getCenter(sourceCard, "right");
+
+        if (!source) continue;
+
+        sources.push({
+          source,
+          active:
+            sourceMatch.status === "ready" ||
+            sourceMatch.status === "in_progress" ||
+            targetMatch.status === "ready" ||
+            targetMatch.status === "in_progress"
+        });
+      }
+
+      if (!sources.length) continue;
+
+      sources.sort((a, b) => a.source.y - b.source.y);
+
+      if (sources.length === 1) {
+        const item = sources[0];
+        drawPath(
+          `M ${item.source.x} ${item.source.y} H ${target.x}`,
+          item.active
+        );
+        continue;
+      }
+
+      const minY = sources[0].source.y;
+      const maxY = sources[sources.length - 1].source.y;
+      const maxSourceX = Math.max(
+        ...sources.map((item) => item.source.x)
       );
 
-    const finalMatch =
-      finalMatches
-        .sort(
-          (a, b) =>
-            Number(b.round) - Number(a.round)
-        )[0];
+      const busX =
+        maxSourceX +
+        Math.max(16, (target.x - maxSourceX) / 2);
 
-    const championCard =
-      board.querySelector(
-        "[data-champion-card=\"true\"]"
+      const anyActive = sources.some(
+        (item) => item.active
       );
+
+      for (const item of sources) {
+        drawPath(
+          `M ${item.source.x} ${item.source.y} H ${busX}`,
+          item.active
+        );
+      }
+
+      drawPath(
+        `M ${busX} ${minY} V ${maxY}`,
+        anyActive
+      );
+
+      drawPath(
+        `M ${busX} ${target.y} H ${target.x}`,
+        anyActive
+      );
+    }
+
+    /* 最後一場 → 冠軍 */
+    const finalMatches = matches.filter(
+      (match) =>
+        (
+          match.bracket === "winners" ||
+          match.bracket === "grand_final"
+        ) &&
+        (
+          !match.next_match_id ||
+          match.is_grand_final
+        )
+    );
+
+    const finalMatch = finalMatches.sort(
+      (a, b) => Number(b.round) - Number(a.round)
+    )[0];
+
+    const championCard = board.querySelector(
+      "[data-champion-card=\"true\"]"
+    );
 
     if (finalMatch && championCard) {
+      const sourceSlot = board.querySelector(
+        `.match-slot[data-match-id="${Number(finalMatch.id)}"]`
+      );
+      const sourceCard = sourceSlot?.querySelector(".match-card");
+      const start = getCenter(sourceCard, "right");
+      const end = getCenter(championCard, "left");
 
-      const sourceSlot =
-        board.querySelector(
-          `.match-slot[data-match-id="${Number(finalMatch.id)}"]`
-        );
-
-      const sourceCard =
-        sourceSlot?.querySelector(".match-card");
-
-      if (sourceCard) {
-        addPath(
-          sourceCard,
-          championCard,
+      if (start && end) {
+        const active =
           finalMatch.status === "ready" ||
           finalMatch.status === "in_progress" ||
-          finalMatch.status === "completed"
+          finalMatch.status === "completed";
+
+        drawPath(
+          `M ${start.x} ${start.y} H ${end.x}`,
+          active
         );
       }
     }
