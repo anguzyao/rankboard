@@ -985,6 +985,10 @@ Tournament ID: ${data.tournamentId}`,
   // 載入賽事列表
   // ==========================================================
 
+  // ==========================================================
+  // 載入賽事列表
+  // ==========================================================
+
   async function loadTournaments() {
 
     const container =
@@ -1026,6 +1030,7 @@ Tournament ID: ${data.tournamentId}`,
                   ? "已完成"
                   : "進行中";
 
+
               return `
                 <div
                   class="tournament-item"
@@ -1037,28 +1042,66 @@ Tournament ID: ${data.tournamentId}`,
                     )}
                   </strong>
 
+
                   <div class="muted">
+
                     ID：
-                    ${tournament.id}
+                    ${escapeHtml(
+                      String(tournament.id)
+                    )}
+
                    　
                     人數：
-                    ${tournament.size}
+                    ${escapeHtml(
+                      String(tournament.size || "")
+                    )}
+
                    　
                     賽制：
-                    ${format}
+                    ${escapeHtml(format)}
+
                    　
                     狀態：
-                    ${status}
+                    ${escapeHtml(status)}
+
                   </div>
+
 
                   <br>
 
-                  <button
-                    class="secondary"
-                    onclick="loadTournamentDetail(${tournament.id})"
+
+                  <div
+                    class="button-row"
                   >
-                    查看賽程資料
-                  </button>
+
+                    <button
+                      class="secondary"
+                      onclick="
+                        loadTournamentDetail(
+                          ${Number(tournament.id)}
+                        )
+                      "
+                    >
+                      查看賽程資料
+                    </button>
+
+
+                    <button
+                      class="danger"
+                      onclick="
+                        deleteTournament(
+                          ${Number(tournament.id)},
+                          '${escapeHtml(
+                            tournament.name
+                          ).replace(/'/g, "\\'")}'
+                        )
+                      "
+                    >
+                      刪除賽程
+                    </button>
+
+                  </div>
+
 
                 </div>
               `;
@@ -1066,12 +1109,105 @@ Tournament ID: ${data.tournamentId}`,
           )
           .join("");
 
+
     } catch (error) {
 
       container.textContent =
         error.message;
 
     }
+
+  }
+
+
+  // ==========================================================
+  // 刪除賽事
+  // ==========================================================
+
+  async function deleteTournament(
+    tournamentId,
+    tournamentName
+  ) {
+
+    const confirmed =
+      confirm(
+        `確定要刪除「${tournamentName}」嗎？\n\n` +
+        `這個賽程以及其中所有參賽者、對戰資料都會一起刪除。\n\n` +
+        `刪除後無法復原。`
+      );
+
+
+    if (!confirmed) {
+
+      return;
+
+    }
+
+
+    try {
+
+      await api(
+        `/api/tournaments/${tournamentId}`,
+        {
+          method: "DELETE"
+        }
+      );
+
+
+      // 如果目前正在查看被刪除的賽事，
+      // 清除右側／下方的詳細資料。
+
+      const bracketOutput =
+        $("bracketOutput");
+
+      const detailOutput =
+        $("detailOutput");
+
+
+      if (bracketOutput) {
+
+        bracketOutput.innerHTML = `
+          <div class="bracket-empty">
+            尚未選擇賽事
+          </div>
+        `;
+
+      }
+
+
+      if (detailOutput) {
+
+        detailOutput.textContent =
+          "尚未選擇賽事";
+
+      }
+
+
+      // 重新載入賽事列表
+
+      await loadTournaments();
+
+
+      alert(
+        `賽事「${tournamentName}」已刪除。`
+      );
+
+
+    } catch (error) {
+
+      console.error(
+        "刪除賽事失敗：",
+        error
+      );
+
+
+      alert(
+        error.message ||
+        "刪除賽事失敗"
+      );
+
+    }
+
   }
 
 
