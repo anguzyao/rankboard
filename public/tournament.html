@@ -1207,12 +1207,13 @@ async function loadTournaments() {
                   <button
                     class="secondary"
                     onclick="
-                      openPublicTournament(
-                        ${Number(tournament.id)}
+                      copyPublicTournamentUrl(
+                        ${Number(tournament.id)},
+                        this
                       )
                     "
                   >
-                    👁 公開賽程
+                    👁 分享公開賽程
                   </button>
 
 
@@ -1254,17 +1255,49 @@ async function loadTournaments() {
 // 開啟公開賽程
 // ==========================================================
 
-function openPublicTournament(
-  tournamentId
+// ==========================================================
+// 複製公開賽程網址
+// ==========================================================
+
+async function copyPublicTournamentUrl(
+  tournamentId,
+  button
 ) {
 
   const publicUrl =
-    `/tournament-view.html?id=${tournamentId}`;
+    `${window.location.origin}/tournament-view.html?id=${tournamentId}`;
 
-  window.open(
-    publicUrl,
-    "_blank"
-  );
+  try {
+
+    await navigator.clipboard.writeText(
+      publicUrl
+    );
+
+    const originalText =
+      button.textContent;
+
+    button.textContent =
+      "✅ 已複製網址";
+
+    setTimeout(() => {
+
+      button.textContent =
+        originalText;
+
+    }, 1500);
+
+  } catch (error) {
+
+    console.error(
+      "複製網址失敗：",
+      error
+    );
+
+    alert(
+      `複製失敗，請手動複製：\n\n${publicUrl}`
+    );
+
+  }
 
 }
 
