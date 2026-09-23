@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>Corner X 賽程安排</title>
+  <title>Corner X 賽程安排器</title>
 
   <style>
     * {
@@ -375,10 +375,35 @@
        ========================================================== */
 
     .bracket-champion {
-      margin-top: 8px;
       width: 190px;
       flex: 0 0 190px;
       align-self: flex-start;
+    }
+
+    /*
+     * 冠軍欄與最後一輪使用完全相同的 130px 網格。
+     * 這樣冠軍卡會依照決賽的位置自動垂直對齊，
+     * 不再使用固定 margin-top。
+     */
+    .bracket-champion-grid {
+      display: grid;
+      grid-template-rows: repeat(
+        var(--slot-count),
+        130px
+      );
+      position: relative;
+    }
+
+    .bracket-champion-slot {
+      position: relative;
+      align-self: stretch;
+      min-width: 0;
+    }
+
+    .bracket-champion-content {
+      position: relative;
+      top: 50%;
+      transform: translateY(-50%);
     }
 
     .bracket-champion-title {
@@ -558,13 +583,8 @@
     class="container hidden"
   >
 
-    <!-- 點擊標題回到積分榜 -->
-    <h1
-      onclick="window.location.assign('/')"
-      style="cursor: pointer;"
-      title="回到積分榜"
-    >
-      Corner X 賽程安排
+    <h1>
+      Corner X 賽程安排器
     </h1>
 
     <div class="subtitle">
@@ -1108,275 +1128,270 @@ Tournament ID: ${data.tournamentId}`,
     );
 
 
-  // ==========================================================
-  // 載入賽事列表
-  // ==========================================================
+ // ==========================================================
+// 載入賽事列表
+// ==========================================================
 
-  async function loadTournaments() {
+async function loadTournaments() {
 
-    const container =
-      $("tournamentList");
+  const container =
+    $("tournamentList");
 
-    try {
+  try {
 
-      const data =
-        await api(
-          "/api/tournaments"
-        );
+    const data =
+      await api(
+        "/api/tournaments"
+      );
 
-      const tournaments =
-        data.tournaments || [];
+    const tournaments =
+      data.tournaments || [];
 
-      if (!tournaments.length) {
-
-        container.innerHTML =
-          '<div class="muted">目前沒有賽事</div>';
-
-        return;
-      }
-
+    if (!tournaments.length) {
 
       container.innerHTML =
-        tournaments
-          .map(
-            (tournament) => {
+        '<div class="muted">目前沒有賽事</div>';
 
-              const format =
-                tournament.format ===
-                "single_elimination"
-                  ? "單淘汰"
-                  : "雙敗";
-
-              const status =
-                tournament.status ===
-                "completed"
-                  ? "已完成"
-                  : "進行中";
+      return;
+    }
 
 
-              return `
-                <div
-                  class="tournament-item"
-                >
+    container.innerHTML =
+      tournaments
+        .map(
+          (tournament) => {
 
-                  <strong>
-                    ${escapeHtml(
-                      tournament.name
-                    )}
-                  </strong>
+            const format =
+              tournament.format ===
+              "single_elimination"
+                ? "單淘汰"
+                : "雙敗";
 
-
-                  <div class="muted">
-
-                    ID：
-                    ${escapeHtml(
-                      String(tournament.id)
-                    )}
-
-                    　
-                    人數：
-                    ${escapeHtml(
-                      String(tournament.size || "")
-                    )}
-
-                    　
-                    賽制：
-                    ${escapeHtml(format)}
-
-                    　
-                    狀態：
-                    ${escapeHtml(status)}
-
-                  </div>
+            const status =
+              tournament.status ===
+              "completed"
+                ? "已完成"
+                : "進行中";
 
 
-                  <br>
+            return `
+              <div
+                class="tournament-item"
+              >
+
+                <strong>
+                  ${escapeHtml(
+                    tournament.name
+                  )}
+                </strong>
 
 
-                  <div
-                    class="button-row"
-                  >
+                <div class="muted">
 
-                    <button
-                      class="secondary"
-                      onclick="
-                        loadTournamentDetail(
-                          ${Number(tournament.id)}
-                        )
-                      "
-                    >
-                      查看賽程資料
-                    </button>
+                  ID：
+                  ${escapeHtml(
+                    String(tournament.id)
+                  )}
 
+                  　
+                  人數：
+                  ${escapeHtml(
+                    String(tournament.size || "")
+                  )}
 
-                    <button
-                      class="secondary"
-                      onclick="
-                        randomizeTournament(
-                          ${Number(tournament.id)},
-                          this
-                        )
-                      "
-                    >
-                      🎲 隨機排列
-                    </button>
+                  　
+                  賽制：
+                  ${escapeHtml(format)}
 
-
-                    <button
-                      class="secondary"
-                      onclick="
-                        copyPublicTournamentUrl(
-                          ${Number(tournament.id)},
-                          this
-                        )
-                      "
-                    >
-                      👁 分享公開賽程
-                    </button>
-
-
-                    <button
-                      class="danger"
-                      onclick="
-                        deleteTournament(
-                          ${Number(tournament.id)},
-                          '${escapeHtml(
-                            tournament.name
-                          ).replace(/'/g, "\\'")}'
-                        )
-                      "
-                    >
-                      刪除賽程
-                    </button>
-
-                  </div>
-
+                  　
+                  狀態：
+                  ${escapeHtml(status)}
 
                 </div>
-              `;
-            }
-          )
-          .join("");
 
 
-    } catch (error) {
+                <br>
 
-      container.textContent =
-        error.message;
 
-    }
+                <div
+                  class="button-row"
+                >
+
+                  <button
+                    class="secondary"
+                    onclick="
+                      loadTournamentDetail(
+                        ${Number(tournament.id)}
+                      )
+                    "
+                  >
+                    查看賽程資料
+                  </button>
+
+
+                  <button
+                    class="secondary"
+                    onclick="
+                      randomizeTournament(
+                        ${Number(tournament.id)},
+                        this
+                      )
+                    "
+                  >
+                    🎲 隨機排列
+                  </button>
+
+
+                  <button
+                    class="secondary"
+                    onclick="
+                      copyPublicTournamentUrl(
+                        ${Number(tournament.id)},
+                        this
+                      )
+                    "
+                  >
+                    👁 分享公開賽程
+                  </button>
+
+
+                  <button
+                    class="danger"
+                    onclick="
+                      deleteTournament(
+                        ${Number(tournament.id)},
+                        '${escapeHtml(
+                          tournament.name
+                        ).replace(/'/g, "\\'")}'
+                      )
+                    "
+                  >
+                    刪除賽程
+                  </button>
+
+                </div>
+
+
+              </div>
+            `;
+          }
+        )
+        .join("");
+
+
+  } catch (error) {
+
+    container.textContent =
+      error.message;
 
   }
 
+}
 
-  // ==========================================================
-  // 隨機排列
-  // ==========================================================
 
-  async function randomizeTournament(
-    tournamentId,
-    button
-  ) {
+// ==========================================================
+// 開啟公開賽程
+// ==========================================================
+
+// ==========================================================
+// 複製公開賽程網址
+// ==========================================================
+
+async function randomizeTournament(
+  tournamentId,
+  button
+) {
+
+  const originalText =
+    button.textContent;
+
+  try {
+
+    button.disabled = true;
+    button.textContent =
+      "🎲 排列中...";
+
+    await api(
+      `/api/tournaments/${tournamentId}/randomize`,
+      {
+        method: "POST"
+      }
+    );
+
+    button.textContent =
+      "✅ 已重新排列";
+
+    await loadTournaments();
+    await loadTournamentDetail(
+      tournamentId
+    );
+
+    setTimeout(() => {
+      button.textContent =
+        originalText;
+    }, 1500);
+
+  } catch (error) {
+
+    console.error(
+      "隨機排列失敗：",
+      error
+    );
+
+    button.disabled = false;
+    button.textContent =
+      originalText;
+
+    alert(
+      error.message ||
+      "隨機排列失敗"
+    );
+  }
+
+}
+
+
+async function copyPublicTournamentUrl(
+  tournamentId,
+  button
+) {
+
+  const publicUrl =
+    `${window.location.origin}/tournament-view.html?id=${tournamentId}`;
+
+  try {
+
+    await navigator.clipboard.writeText(
+      publicUrl
+    );
 
     const originalText =
       button.textContent;
 
-    try {
+    button.textContent =
+      "✅ 已複製網址";
 
-      button.disabled = true;
-      button.textContent =
-        "🎲 排列中...";
-
-      await api(
-        `/api/tournaments/${tournamentId}/randomize`,
-        {
-          method: "POST"
-        }
-      );
-
-      button.textContent =
-        "✅ 已重新排列";
-
-      await loadTournaments();
-
-      await loadTournamentDetail(
-        tournamentId
-      );
-
-      setTimeout(() => {
-
-        button.textContent =
-          originalText;
-
-      }, 1500);
-
-    } catch (error) {
-
-      console.error(
-        "隨機排列失敗：",
-        error
-      );
-
-      button.disabled = false;
+    setTimeout(() => {
 
       button.textContent =
         originalText;
 
-      alert(
-        error.message ||
-        "隨機排列失敗"
-      );
+    }, 1500);
 
-    }
+  } catch (error) {
 
-  }
+    console.error(
+      "複製網址失敗：",
+      error
+    );
 
-
-  // ==========================================================
-  // 複製公開賽程網址
-  // ==========================================================
-
-  async function copyPublicTournamentUrl(
-    tournamentId,
-    button
-  ) {
-
-    const publicUrl =
-      `${window.location.origin}/tournament-view.html?id=${tournamentId}`;
-
-    try {
-
-      await navigator.clipboard.writeText(
-        publicUrl
-      );
-
-      const originalText =
-        button.textContent;
-
-      button.textContent =
-        "✅ 已複製網址";
-
-      setTimeout(() => {
-
-        button.textContent =
-          originalText;
-
-      }, 1500);
-
-    } catch (error) {
-
-      console.error(
-        "複製網址失敗：",
-        error
-      );
-
-      alert(
-        `複製失敗，請手動複製：\n\n${publicUrl}`
-      );
-
-    }
+    alert(
+      `複製失敗，請手動複製：\n\n${publicUrl}`
+    );
 
   }
+
+}
 
 
   // ==========================================================
@@ -1946,8 +1961,117 @@ Tournament ID: ${data.tournamentId}`,
       );
 
 
+    /*
+     * ========================================================
+     * 冠軍位置
+     *
+     * 不再用固定 margin-top。
+     * 直接抓最後一場真正的決賽，並使用與 bracket 相同的
+     * grid-row 計算方式，讓冠軍卡自動落在決賽正中央。
+     *
+     * 單淘汰：對齊最後一輪
+     * 雙敗：對齊總決賽 / 最後一場決定冠軍的比賽
+     * ========================================================
+     */
+
+    let finalMatchForChampion = null;
+
+    const completedFinalCandidates =
+      activeMatches
+        .filter(
+          (match) =>
+            (
+              match.bracket === "winners" ||
+              match.bracket === "grand_final"
+            ) &&
+            !match.next_match_id &&
+            match.winner_id
+        )
+        .sort(
+          (a, b) => {
+            const roundDiff =
+              Number(b.round || 0) -
+              Number(a.round || 0);
+
+            if (roundDiff !== 0) {
+              return roundDiff;
+            }
+
+            return Number(b.id || 0) -
+              Number(a.id || 0);
+          }
+        );
+
+    if (completedFinalCandidates.length) {
+      finalMatchForChampion =
+        completedFinalCandidates[0];
+    }
+
+    /*
+     * 如果上面沒有找到，就退回目前 columns 的最後一場。
+     * 這只是定位用途，不會影響冠軍姓名判斷。
+     */
+    if (!finalMatchForChampion && columns.length) {
+      const lastColumn =
+        columns[columns.length - 1];
+
+      if (lastColumn && lastColumn.matches.length) {
+        finalMatchForChampion =
+          lastColumn.matches
+            .slice()
+            .sort(
+              (a, b) =>
+                Number(b.position || 0) -
+                Number(a.position || 0)
+            )[0];
+      }
+    }
+
+    let championColumn = null;
+    let championStart = 1;
+    let championSpan = 1;
+
+    if (finalMatchForChampion) {
+
+      championColumn =
+        columns.find(
+          (column) =>
+            column.matches.some(
+              (match) =>
+                Number(match.id) ===
+                Number(finalMatchForChampion.id)
+            )
+        ) || null;
+
+      if (!championColumn && columns.length) {
+        championColumn =
+          columns[columns.length - 1];
+      }
+
+      if (championColumn) {
+        const finalPosition =
+          Number(
+            finalMatchForChampion.position
+          ) || 1;
+
+        championSpan =
+          Math.pow(
+            2,
+            Math.max(
+              0,
+              Number(championColumn.round) - 1
+            )
+          );
+
+        championStart =
+          (finalPosition - 1) *
+            championSpan +
+          1;
+      }
+    }
+
     const championHtml =
-      isCompleted
+      isCompleted && championColumn
 
         ? `
           <div
@@ -1955,37 +2079,65 @@ Tournament ID: ${data.tournamentId}`,
           >
 
             <div
-              class="
-                bracket-champion-title
-              "
-            >
-              冠軍
-            </div>
-
-            <div
-              class="
-                bracket-champion-card
+              class="bracket-champion-grid"
+              style="
+                --slot-count:
+                  ${championColumn.slotCount};
               "
             >
 
               <div
-                class="champion-trophy"
+                class="bracket-champion-slot"
+                style="
+                  grid-row:
+                    ${championStart}
+                    / span
+                    ${championSpan};
+                "
               >
-                🏆
-              </div>
 
-              <div
-                class="champion-label"
-              >
-                本屆冠軍
-              </div>
+                <div
+                  class="bracket-champion-content"
+                >
 
-              <div
-                class="champion-name"
-              >
-                ${escapeHtml(
-                  championName
-                )}
+                  <div
+                    class="
+                      bracket-champion-title
+                    "
+                  >
+                    冠軍
+                  </div>
+
+                  <div
+                    class="
+                      bracket-champion-card
+                    "
+                  >
+
+                    <div
+                      class="champion-trophy"
+                    >
+                      🏆
+                    </div>
+
+                    <div
+                      class="champion-label"
+                    >
+                      本屆冠軍
+                    </div>
+
+                    <div
+                      class="champion-name"
+                    >
+                      ${escapeHtml(
+                        championName
+                      )}
+                    </div>
+
+                  </div>
+
+                </div>
+
               </div>
 
             </div>
@@ -2269,7 +2421,6 @@ Tournament ID: ${data.tournamentId}`,
     `;
 
   }
-
 
   // ==========================================================
   // 選擇勝者
