@@ -1597,259 +1597,278 @@
   // 賽程卡片
   // ========================================================
 
-  function renderMatchCard(
-    match
+function renderMatchCard(
+  match
+) {
+
+  const isBye =
+    Number(
+      match.is_bye_match
+    ) === 1;
+
+
+  const participant1 =
+    match.participant1_name ||
+    "";
+
+
+  const participant2 =
+    match.participant2_name ||
+    "";
+
+
+  const winnerId =
+    match.winner_id === null ||
+    match.winner_id === undefined
+
+      ? null
+
+      : Number(
+          match.winner_id
+        );
+
+
+  const p1Id =
+    match.participant1_id === null ||
+    match.participant1_id === undefined
+
+      ? null
+
+      : Number(
+          match.participant1_id
+        );
+
+
+  const p2Id =
+    match.participant2_id === null ||
+    match.participant2_id === undefined
+
+      ? null
+
+      : Number(
+          match.participant2_id
+        );
+
+
+  let statusText =
+    "等待上一輪結果";
+
+
+  if (isBye) {
+
+    statusText =
+      "BYE・自動晉級";
+
+  } else if (
+    match.status ===
+    "completed"
   ) {
 
-    const isBye =
-      Number(
-        match.is_bye_match
-      ) === 1;
+    statusText =
+      "已完成";
+
+  } else if (
+    match.status ===
+    "in_progress"
+  ) {
+
+    statusText =
+      "進行中";
+
+  } else if (
+    match.status ===
+    "ready"
+  ) {
+
+    statusText =
+      "可進行";
+
+  } else if (
+    participant1 &&
+    participant2
+  ) {
+
+    statusText =
+      "待賽";
+
+  }
 
 
-    const participant1 =
-      match.participant1_name ||
-      "";
+  const p1Class =
+    winnerId !== null &&
+    winnerId === p1Id
+
+      ? "player-name winner"
+
+      : participant1
+
+        ? "player-name"
+
+        : "player-name empty";
 
 
-    const participant2 =
-      match.participant2_name ||
-      "";
+  const p2Class =
+    winnerId !== null &&
+    winnerId === p2Id
+
+      ? "player-name winner"
+
+      : participant2
+
+        ? "player-name"
+
+        : "player-name empty";
 
 
-    const winnerId =
-      match.winner_id === null ||
-      match.winner_id === undefined
+  // ======================================================
+  // play_order
+  //
+  // null = 尚未安排場次
+  // 不可以直接 Number(null)，否則會變成 0
+  // ======================================================
 
-        ? null
-
-        : Number(
-            match.winner_id
-          );
-
-
-    const p1Id =
-      match.participant1_id === null ||
-      match.participant1_id === undefined
-
-        ? null
-
-        : Number(
-            match.participant1_id
-          );
+  const hasPlayOrder =
+    match.play_order !== null &&
+    match.play_order !== undefined &&
+    String(
+      match.play_order
+    ).trim() !== "";
 
 
-    const p2Id =
-      match.participant2_id === null ||
-      match.participant2_id === undefined
-
-        ? null
-
-        : Number(
-            match.participant2_id
-          );
+  const playOrder =
+    hasPlayOrder
+      ? Number(
+          match.play_order
+        )
+      : null;
 
 
-    let statusText =
-      "等待上一輪結果";
+  const matchLabel =
+    playOrder !== null &&
+    Number.isFinite(
+      playOrder
+    ) &&
+    playOrder > 0
+
+      ? `場次 ${playOrder}`
+
+      : "待安排";
 
 
-    if (isBye) {
+  return `
 
-      statusText =
-        "BYE・自動晉級";
+    <div
+      class="
+        match-card
+        ${isBye ? "bye" : ""}
+        ${
+          match.status ===
+          "completed"
+            ? "completed"
+            : ""
+        }
+      "
+    >
 
-    } else if (
-      match.status ===
-      "completed"
-    ) {
+      <div
+        class="match-label"
+      >
 
-      statusText =
-        "已完成";
+        #${escapeHtml(
+          String(
+            match.id
+          )
+        )}
 
-    } else if (
-      match.status ===
-      "in_progress"
-    ) {
+        ・
 
-      statusText =
-        "進行中";
+        ${escapeHtml(
+          matchLabel
+        )}
 
-    } else if (
-      match.status ===
-      "ready"
-    ) {
-
-      statusText =
-        "可進行";
-
-    } else if (
-      participant1 &&
-      participant2
-    ) {
-
-      statusText =
-        "待賽";
-
-    }
+      </div>
 
 
-    const p1Class =
-      winnerId !== null &&
-      winnerId === p1Id
+      <div
+        class="player-row"
+      >
 
-        ? "player-name winner"
-
-        : participant1
-
-          ? "player-name"
-
-          : "player-name empty";
-
-
-    const p2Class =
-      winnerId !== null &&
-      winnerId === p2Id
-
-        ? "player-name winner"
-
-        : participant2
-
-          ? "player-name"
-
-          : "player-name empty";
+        <span
+          class="${p1Class}"
+        >
+          ${escapeHtml(
+            participant1 ||
+            "尚未產生"
+          )}
+        </span>
 
 
-    const playOrder =
-      Number(
-        match.play_order
-      );
+        <span
+          class="player-score"
+        >
+          ${escapeHtml(
+            String(
+              match.score1 ??
+              ""
+            )
+          )}
+        </span>
+
+      </div>
 
 
-    const matchLabel =
-      Number.isFinite(
-        playOrder
-      )
+      <div
+        class="player-row"
+      >
 
-        ? `場次 ${playOrder}`
+        <span
+          class="${p2Class}"
+        >
+          ${escapeHtml(
+            participant2 ||
+            (
+              isBye
+                ? "BYE"
+                : "尚未產生"
+            )
+          )}
+        </span>
 
-        : "待安排";
 
+        <span
+          class="player-score"
+        >
+          ${escapeHtml(
+            String(
+              match.score2 ??
+              ""
+            )
+          )}
+        </span>
 
-    return `
+      </div>
+
 
       <div
         class="
-          match-card
-          ${isBye ? "bye" : ""}
+          match-status
           ${
-            match.status ===
-            "completed"
-              ? "completed"
+            isBye
+              ? "bye-text"
               : ""
           }
         "
       >
-
-        <div
-          class="match-label"
-        >
-
-          #${escapeHtml(
-            String(
-              match.id
-            )
-          )}
-
-          ・
-
-          ${escapeHtml(
-            matchLabel
-          )}
-
-        </div>
-
-
-        <div
-          class="player-row"
-        >
-
-          <span
-            class="${p1Class}"
-          >
-            ${escapeHtml(
-              participant1 ||
-              "尚未產生"
-            )}
-          </span>
-
-
-          <span
-            class="player-score"
-          >
-            ${escapeHtml(
-              String(
-                match.score1 ??
-                ""
-              )
-            )}
-          </span>
-
-        </div>
-
-
-        <div
-          class="player-row"
-        >
-
-          <span
-            class="${p2Class}"
-          >
-            ${escapeHtml(
-              participant2 ||
-              (
-                isBye
-                  ? "BYE"
-                  : "尚未產生"
-              )
-            )}
-          </span>
-
-
-          <span
-            class="player-score"
-          >
-            ${escapeHtml(
-              String(
-                match.score2 ??
-                ""
-              )
-            )}
-          </span>
-
-        </div>
-
-
-        <div
-          class="
-            match-status
-            ${
-              isBye
-                ? "bye-text"
-                : ""
-            }
-          "
-        >
-          ${escapeHtml(
-            statusText
-          )}
-        </div>
-
+        ${escapeHtml(
+          statusText
+        )}
       </div>
 
-    `;
+    </div>
 
-  }
+  `;
+
+}
 
 
   // ========================================================
