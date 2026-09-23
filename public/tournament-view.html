@@ -1310,98 +1310,143 @@
 
 
   // ========================================================
-  // 找目前進行中的比賽
+  // 找目前對戰
+  //
+  // 規則：
+  // 1. 排除 BYE
+  // 2. ready / in_progress 都視為目前可進行對戰
+  // 3. 依 play_order 排序
+  // 4. 只顯示最前面的 1 場
   // ========================================================
 
-// ========================================================
-// 找目前可以進行中的比賽
-// ========================================================
+  function renderCurrentMatch(
+    matches
+  ) {
 
-function renderCurrentMatch(
-  matches
-) {
+    const section =
+      document.getElementById(
+        "currentMatch"
+      );
 
-  const section =
-    document.getElementById(
-      "currentMatch"
-    );
 
-  const players =
-    document.getElementById(
-      "currentPlayers"
-    );
+    const players =
+      document.getElementById(
+        "currentPlayers"
+      );
 
-  // ======================================================
-  // 找出目前可以進行的比賽
-  //
-  // ready：
-  // 代表兩位選手都已經產生，可以進行比賽
-  //
-  // in_progress：
-  // 如果未來系統加入「比賽進行中」狀態，也一起支援
-  // ======================================================
 
-  const currentMatches =
-    matches.filter(
-      (item) =>
-        item.status === "ready" ||
-        item.status === "in_progress"
-    );
+    const currentMatches =
+      matches
 
-  // 沒有目前對戰
-  if (!currentMatches.length) {
+        .filter(
+          (item) =>
+            !Number(
+              item.is_bye_match
+            ) &&
+            (
+              item.status ===
+                "ready" ||
+              item.status ===
+                "in_progress"
+            )
+        )
+
+        .sort(
+          (a, b) =>
+            Number(
+              a.play_order ??
+              999999
+            ) -
+            Number(
+              b.play_order ??
+              999999
+            )
+        );
+
+
+    const match =
+      currentMatches[0];
+
+
+    if (!match) {
+
+      section.classList
+        .remove("show");
+
+      players.innerHTML = "";
+
+      return;
+
+    }
+
 
     section.classList
-      .remove("show");
+      .add("show");
 
-    players.innerHTML = "";
 
-    return;
+    const playOrder =
+      Number(
+        match.play_order
+      );
+
+
+    const orderText =
+      Number.isFinite(
+        playOrder
+      )
+
+        ? `場次 ${playOrder}`
+
+        : "目前對戰";
+
+
+    players.innerHTML = `
+
+      <div
+        style="
+          grid-column: 1 / -1;
+          color: #bfff66;
+          font-size: 12px;
+          font-weight: 800;
+          text-align: center;
+          margin-bottom: 2px;
+        "
+      >
+        ${escapeHtml(
+          orderText
+        )}
+      </div>
+
+
+      <div
+        class="current-player"
+      >
+        ${escapeHtml(
+          match.participant1_name ||
+          "尚未產生"
+        )}
+      </div>
+
+
+      <div
+        class="vs"
+      >
+        VS
+      </div>
+
+
+      <div
+        class="current-player"
+      >
+        ${escapeHtml(
+          match.participant2_name ||
+          "尚未產生"
+        )}
+      </div>
+
+    `;
 
   }
-
-  section.classList
-    .add("show");
-
-  // ======================================================
-  // 如果同時有多場可以進行
-  // 就全部顯示
-  // ======================================================
-
-  players.innerHTML =
-    currentMatches
-      .map(
-        (match) => `
-
-          <div
-            class="current-player"
-          >
-            ${escapeHtml(
-              match.participant1_name ||
-              "尚未產生"
-            )}
-          </div>
-
-          <div
-            class="vs"
-          >
-            VS
-          </div>
-
-          <div
-            class="current-player"
-          >
-            ${escapeHtml(
-              match.participant2_name ||
-              "尚未產生"
-            )}
-          </div>
-
-        `
-      )
-      .join("");
-
-}
 
 
   // ========================================================
@@ -1623,6 +1668,22 @@ function renderCurrentMatch(
         "已完成";
 
     } else if (
+      match.status ===
+      "in_progress"
+    ) {
+
+      statusText =
+        "進行中";
+
+    } else if (
+      match.status ===
+      "ready"
+    ) {
+
+      statusText =
+        "可進行";
+
+    } else if (
       participant1 &&
       participant2
     ) {
@@ -1659,6 +1720,22 @@ function renderCurrentMatch(
           : "player-name empty";
 
 
+    const playOrder =
+      Number(
+        match.play_order
+      );
+
+
+    const matchLabel =
+      Number.isFinite(
+        playOrder
+      )
+
+        ? `場次 ${playOrder}`
+
+        : "待安排";
+
+
     return `
 
       <div
@@ -1686,10 +1763,8 @@ function renderCurrentMatch(
 
           ・
 
-          場次 ${escapeHtml(
-            String(
-              match.position
-            )
+          ${escapeHtml(
+            matchLabel
           )}
 
         </div>
