@@ -1,9 +1,28 @@
+import { handleTournamentRoutes } from "./tournaments.js";
+
 const SESSION_COOKIE = "admin_session";
 const SESSION_MINUTES = 30;
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // =========================
+    // 賽程安排器
+    // =========================
+    if (url.pathname.startsWith("/api/tournaments")) {
+      const tournamentResponse = await handleTournamentRoutes(
+        request,
+        env,
+        url,
+        requireAdmin,
+        jsonResponse
+      );
+
+      if (tournamentResponse) {
+        return tournamentResponse;
+      }
+    }
 
     // =========================
     // 公開排名
