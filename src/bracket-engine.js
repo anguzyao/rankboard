@@ -406,6 +406,9 @@ function generateSingleElimination(
 
   // ----------------------------------------------------------
   // 建立所有 Winners Match
+  //
+  // 只有第一輪可以產生 BYE。
+  // 第二輪以後永遠先建立成 pending。
   // ----------------------------------------------------------
 
   for (
@@ -444,6 +447,10 @@ function generateSingleElimination(
         false;
 
 
+      // --------------------------------------------------------
+      // 第一輪：從實際參賽者建立對戰
+      // --------------------------------------------------------
+
       if (
         round === 1
       ) {
@@ -460,6 +467,7 @@ function generateSingleElimination(
           ] || null;
 
 
+        // 兩邊都有選手
         if (
           participant1 &&
           participant2
@@ -468,7 +476,12 @@ function generateSingleElimination(
           status =
             "ready";
 
-        } else if (
+        }
+
+
+        // 只有一邊有選手
+        // → 只有第一輪才能判定 BYE
+        else if (
           participant1 ||
           participant2
         ) {
@@ -483,12 +496,44 @@ function generateSingleElimination(
             participant1 ||
             participant2;
 
-        } else {
+        }
+
+
+        // 兩邊都沒有選手
+        else {
 
           status =
             "void";
 
         }
+
+      }
+
+
+      // --------------------------------------------------------
+      // 第二輪以後：
+      //
+      // 不預先放任何選手。
+      // 不預先產生 BYE。
+      // 等第一輪比賽結果透過 nextMatch 傳入。
+      // --------------------------------------------------------
+
+      else {
+
+        participant1 =
+          null;
+
+        participant2 =
+          null;
+
+        winner =
+          null;
+
+        status =
+          "pending";
+
+        isByeMatch =
+          false;
 
       }
 
@@ -526,15 +571,70 @@ function generateSingleElimination(
   }
 
 
+  // ----------------------------------------------------------
+  // 建立 Winners → Winners 的連接
+  // ----------------------------------------------------------
+
   connectWinners(
     matches,
     rounds
   );
 
 
+  // ----------------------------------------------------------
+  // 第一輪 BYE 自動晉級
+  //
+  // 這個函式只允許處理 round === 1 的 BYE。
+  // ----------------------------------------------------------
+
   propagateInitialByes(
     matches
   );
+
+
+  // ----------------------------------------------------------
+  // 最後再做一次安全檢查：
+  //
+  // 第二輪以後絕對不能是 BYE。
+  // 即使未來其他程式修改造成資料污染，
+  // 也不能讓 R2/R3 被誤判成 BYE。
+  // ----------------------------------------------------------
+
+  for (
+    const match of matches
+  ) {
+
+    if (
+      match.bracket === "winners" &&
+      match.round > 1
+    ) {
+
+      match.isByeMatch =
+        false;
+
+      // 第二輪以後只有在兩邊都有實際選手時
+      // 才能進入 ready。
+      if (
+        match.participant1 &&
+        match.participant2
+      ) {
+
+        match.status =
+          "ready";
+
+      } else {
+
+        match.status =
+          "pending";
+
+        match.winner =
+          null;
+
+      }
+
+    }
+
+  }
 
 
   return {
