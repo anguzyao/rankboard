@@ -220,11 +220,36 @@
      * 因此會自然落在前一輪兩場比賽的正中央。
      */
     .bracket-board {
+      position: relative;
       display: flex;
       align-items: flex-start;
       gap: 24px;
       min-width: max-content;
-      padding: 8px 4px 22px;
+      padding: 8px 4px 25px;
+    }
+
+    .bracket-lines {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .bracket-line {
+      fill: none;
+      stroke: #4b5644;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.9;
+    }
+
+    .bracket-line.active {
+      stroke: #8cff00;
+      opacity: 1;
     }
 
     .bracket-column {
@@ -374,43 +399,36 @@
        冠軍
        ========================================================== */
 
-    .bracket-champion {
+    .champion-column {
+      position: relative;
+      z-index: 1;
       width: 190px;
       flex: 0 0 190px;
-      align-self: flex-start;
     }
 
-    /*
-     * 冠軍欄與最後一輪使用完全相同的 130px 網格。
-     * 這樣冠軍卡會依照決賽的位置自動垂直對齊，
-     * 不再使用固定 margin-top。
-     */
-    .bracket-champion-grid {
+    .champion-matches {
       display: grid;
-      grid-template-rows: repeat(
-        var(--slot-count),
-        130px
-      );
+      grid-template-rows: repeat(var(--slot-count), 130px);
       position: relative;
     }
 
-    .bracket-champion-slot {
+    .champion-slot {
       position: relative;
       align-self: stretch;
       min-width: 0;
     }
 
-    .bracket-champion-content {
+    .champion-slot .champion-card {
       position: relative;
       top: 50%;
       transform: translateY(-50%);
     }
 
-    .bracket-champion-title {
+    .champion-title {
       text-align: center;
       color: #bfff66;
       font-size: 14px;
-      font-weight: 800;
+      font-weight: 900;
       margin-bottom: 14px;
       padding: 8px;
       border: 1px solid #8cff00;
@@ -418,36 +436,23 @@
       background: #151b0f;
     }
 
-    .bracket-champion-card {
+    .champion-card {
       position: relative;
       border: 1px solid #8cff00;
-      border-radius: 10px;
-      background:
-        linear-gradient(
-          180deg,
-          #17200f 0%,
-          #11150c 100%
-        );
-      padding: 16px 12px;
+      border-radius: 12px;
+      background: linear-gradient(180deg, #17200f, #10150d);
+      padding: 18px 12px;
       text-align: center;
-      box-shadow:
-        0 0 18px rgba(140, 255, 0, 0.08);
+      box-shadow: 0 0 20px rgba(140, 255, 0, 0.08);
     }
 
-    .bracket-champion-card::before {
-      content: "";
-      position: absolute;
-      left: -25px;
-      top: 50%;
-      width: 24px;
-      height: 1px;
-      background: #8cff00;
+    .champion-card::before {
+      display: none;
     }
 
-    .champion-trophy {
-      font-size: 25px;
-      line-height: 1;
-      margin-bottom: 8px;
+    .trophy {
+      font-size: 28px;
+      margin-bottom: 7px;
     }
 
     .champion-label {
@@ -458,21 +463,9 @@
 
     .champion-name {
       color: #bfff66;
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 900;
       word-break: break-word;
-    }
-
-    .bracket-empty {
-      padding: 24px;
-      text-align: center;
-      color: #777;
-      border: 1px dashed #444;
-      border-radius: 10px;
-    }
-
-    .raw-detail {
-      margin-top: 18px;
     }
 
     @media (max-width: 600px) {
@@ -481,7 +474,7 @@
       }
 
       .bracket-column,
-      .bracket-champion {
+      .champion-column {
         width: 175px;
         flex-basis: 175px;
       }
@@ -1748,6 +1741,7 @@ async function copyPublicTournamentUrl(
                     return `
                       <div
                         class="match-slot"
+                        data-match-id="${Number(match.id)}"
                         style="
                           grid-row:
                             ${start}
@@ -2070,70 +2064,57 @@ async function copyPublicTournamentUrl(
       }
     }
 
-    const championHtml =
-      isCompleted && championColumn
+    const finalColumn =
+      columns
+        .filter((column) =>
+          isDouble
+            ? column.bracket === "grand_final"
+            : column.bracket === "winners"
+        )
+        .sort(
+          (a, b) =>
+            Number(b.round) - Number(a.round)
+        )[0] || null;
 
+    const finalSlotCount =
+      finalColumn
+        ? Number(finalColumn.slotCount) || 1
+        : 1;
+
+    const championHtml =
+      isCompleted
         ? `
-          <div
-            class="bracket-champion"
-          >
+          <div class="champion-column">
+
+            <div class="champion-title">
+              🏆 冠軍
+            </div>
 
             <div
-              class="bracket-champion-grid"
-              style="
-                --slot-count:
-                  ${championColumn.slotCount};
-              "
+              class="champion-matches"
+              style="--slot-count: ${finalSlotCount};"
             >
 
               <div
-                class="bracket-champion-slot"
-                style="
-                  grid-row:
-                    ${championStart}
-                    / span
-                    ${championSpan};
-                "
+                class="champion-slot"
+                style="grid-row: 1 / span ${finalSlotCount};"
               >
 
                 <div
-                  class="bracket-champion-content"
+                  class="champion-card"
+                  data-champion-card="true"
                 >
 
-                  <div
-                    class="
-                      bracket-champion-title
-                    "
-                  >
-                    冠軍
+                  <div class="trophy">
+                    🏆
                   </div>
 
-                  <div
-                    class="
-                      bracket-champion-card
-                    "
-                  >
+                  <div class="champion-label">
+                    本屆冠軍
+                  </div>
 
-                    <div
-                      class="champion-trophy"
-                    >
-                      🏆
-                    </div>
-
-                    <div
-                      class="champion-label"
-                    >
-                      本屆冠軍
-                    </div>
-
-                    <div
-                      class="champion-name"
-                    >
-                      ${escapeHtml(
-                        championName
-                      )}
-                    </div>
-
+                  <div class="champion-name">
+                    ${escapeHtml(championName)}
                   </div>
 
                 </div>
@@ -2144,9 +2125,7 @@ async function copyPublicTournamentUrl(
 
           </div>
         `
-
         : "";
-
 
     container.innerHTML = `
       <div
@@ -2199,6 +2178,11 @@ async function copyPublicTournamentUrl(
           class="bracket-board"
         >
 
+          <svg
+            class="bracket-lines"
+            aria-hidden="true"
+          ></svg>
+
           ${board}
 
           ${championHtml}
@@ -2208,6 +2192,250 @@ async function copyPublicTournamentUrl(
       </div>
     `;
 
+    requestAnimationFrame(() => {
+      drawBracketLines(activeMatches);
+    });
+
+  }
+
+
+  /* ========================================================
+     Bracket 自動連線
+
+     依照 next_match_id / loser_next_match_id 自動繪製。
+     同時把最後一場連到冠軍卡。
+     ======================================================== */
+
+  function drawBracketLines(matches) {
+
+    const board =
+      document.querySelector(".bracket-board");
+
+    const svg =
+      board?.querySelector(".bracket-lines");
+
+    if (!board || !svg) {
+      return;
+    }
+
+    const boardRect =
+      board.getBoundingClientRect();
+
+    const width =
+      Math.max(
+        board.scrollWidth,
+        boardRect.width
+      );
+
+    const height =
+      Math.max(
+        board.scrollHeight,
+        boardRect.height
+      );
+
+    svg.setAttribute(
+      "viewBox",
+      `0 0 ${width} ${height}`
+    );
+
+    svg.setAttribute(
+      "width",
+      String(width)
+    );
+
+    svg.setAttribute(
+      "height",
+      String(height)
+    );
+
+    svg.innerHTML = "";
+
+    const matchMap =
+      new Map(
+        matches.map((match) => [
+          Number(match.id),
+          match
+        ])
+      );
+
+    function getCenter(element, side) {
+      if (!element) {
+        return null;
+      }
+
+      const rect =
+        element.getBoundingClientRect();
+
+      const y =
+        rect.top -
+        boardRect.top +
+        rect.height / 2;
+
+      const x =
+        side === "right"
+          ? rect.right - boardRect.left
+          : rect.left - boardRect.left;
+
+      return { x, y };
+    }
+
+    function addPath(source, target, active) {
+      if (!source || !target) {
+        return;
+      }
+
+      const start =
+        getCenter(source, "right");
+
+      const end =
+        getCenter(target, "left");
+
+      if (!start || !end) {
+        return;
+      }
+
+      const midX =
+        start.x +
+        Math.max(18, (end.x - start.x) / 2);
+
+      const path =
+        document.createElementNS(
+          "http://www.w3.org/2000/svg",
+          "path"
+        );
+
+      path.setAttribute(
+        "class",
+        active
+          ? "bracket-line active"
+          : "bracket-line"
+      );
+
+      path.setAttribute(
+        "d",
+        [
+          `M ${start.x} ${start.y}`,
+          `H ${midX}`,
+          `V ${end.y}`,
+          `H ${end.x}`
+        ].join(" ")
+      );
+
+      svg.appendChild(path);
+    }
+
+    for (const match of matches) {
+
+      const sourceSlot =
+        board.querySelector(
+          `.match-slot[data-match-id="${Number(match.id)}"]`
+        );
+
+      if (!sourceSlot) {
+        continue;
+      }
+
+      const sourceCard =
+        sourceSlot.querySelector(".match-card");
+
+      if (!sourceCard) {
+        continue;
+      }
+
+      const targetIds = new Set();
+
+      if (match.next_match_id) {
+        targetIds.add(Number(match.next_match_id));
+      }
+
+      if (match.loser_next_match_id) {
+        targetIds.add(Number(match.loser_next_match_id));
+      }
+
+      for (const targetId of targetIds) {
+
+        const targetMatch =
+          matchMap.get(targetId);
+
+        if (!targetMatch) {
+          continue;
+        }
+
+        const targetSlot =
+          board.querySelector(
+            `.match-slot[data-match-id="${targetId}"]`
+          );
+
+        if (!targetSlot) {
+          continue;
+        }
+
+        const targetCard =
+          targetSlot.querySelector(".match-card");
+
+        if (!targetCard) {
+          continue;
+        }
+
+        const active =
+          match.status === "ready" ||
+          match.status === "in_progress" ||
+          targetMatch.status === "ready" ||
+          targetMatch.status === "in_progress";
+
+        addPath(
+          sourceCard,
+          targetCard,
+          active
+        );
+      }
+    }
+
+    const finalMatches =
+      matches.filter(
+        (match) =>
+          (
+            match.bracket === "winners" ||
+            match.bracket === "grand_final"
+          ) &&
+          (
+            !match.next_match_id ||
+            match.is_grand_final
+          )
+      );
+
+    const finalMatch =
+      finalMatches
+        .sort(
+          (a, b) =>
+            Number(b.round) - Number(a.round)
+        )[0];
+
+    const championCard =
+      board.querySelector(
+        "[data-champion-card=\"true\"]"
+      );
+
+    if (finalMatch && championCard) {
+
+      const sourceSlot =
+        board.querySelector(
+          `.match-slot[data-match-id="${Number(finalMatch.id)}"]`
+        );
+
+      const sourceCard =
+        sourceSlot?.querySelector(".match-card");
+
+      if (sourceCard) {
+        addPath(
+          sourceCard,
+          championCard,
+          finalMatch.status === "ready" ||
+          finalMatch.status === "in_progress" ||
+          finalMatch.status === "completed"
+        );
+      }
+    }
   }
 
 
