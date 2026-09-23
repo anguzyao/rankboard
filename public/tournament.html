@@ -2,11 +2,7 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
   <title>Corner X 賽程安排器</title>
 
@@ -202,7 +198,7 @@
       justify-content: space-between;
       align-items: center;
       gap: 12px;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
 
     .bracket-title {
@@ -216,12 +212,19 @@
       white-space: nowrap;
     }
 
+    /*
+     * 新版賽程區：
+     * 不再用固定 gap / padding-top 推算位置。
+     * 每一列代表一個「第一輪場次高度」，
+     * 後面的輪次直接跨越 2、4、8 列，
+     * 因此會自然落在前一輪兩場比賽的正中央。
+     */
     .bracket-board {
       display: flex;
       align-items: flex-start;
-      gap: 22px;
+      gap: 24px;
       min-width: max-content;
-      padding: 8px 4px 18px;
+      padding: 8px 4px 22px;
     }
 
     .bracket-column {
@@ -242,27 +245,52 @@
     }
 
     .bracket-matches {
-      display: flex;
-      flex-direction: column;
+      display: grid;
+      grid-template-rows: repeat(var(--slot-count), 130px);
+      position: relative;
+    }
+
+    .match-slot {
+      position: relative;
+      align-self: stretch;
+      min-width: 0;
     }
 
     .match-card {
       position: relative;
+      align-self: center;
+      top: 50%;
+      transform: translateY(-50%);
       border: 1px solid #444;
       border-radius: 9px;
       overflow: visible;
       background: #151515;
       min-height: 82px;
+      z-index: 1;
     }
 
     .match-card::after {
       content: "";
       position: absolute;
-      right: -23px;
+      right: -25px;
       top: 50%;
-      width: 22px;
+      width: 24px;
       height: 1px;
       background: #555;
+    }
+
+    .match-card::before {
+      content: "";
+      position: absolute;
+      left: -13px;
+      top: 50%;
+      width: 13px;
+      height: 1px;
+      background: #555;
+    }
+
+    .bracket-column:first-child .match-card::before {
+      display: none;
     }
 
     .bracket-column:last-child .match-card::after {
@@ -276,7 +304,8 @@
 
     .match-card.ready {
       border-color: #8cff00;
-      box-shadow: 0 0 0 1px rgba(140, 255, 0, 0.08);
+      box-shadow:
+        0 0 0 1px rgba(140, 255, 0, 0.08);
     }
 
     .match-card.completed {
@@ -341,6 +370,74 @@
       color: #9aaa7b;
     }
 
+    /* ==========================================================
+       冠軍
+       ========================================================== */
+
+    .bracket-champion {
+      margin-top: 8px;
+      width: 190px;
+      flex: 0 0 190px;
+      align-self: flex-start;
+    }
+
+    .bracket-champion-title {
+      text-align: center;
+      color: #bfff66;
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 14px;
+      padding: 8px;
+      border: 1px solid #8cff00;
+      border-radius: 8px;
+      background: #151b0f;
+    }
+
+    .bracket-champion-card {
+      position: relative;
+      border: 1px solid #8cff00;
+      border-radius: 10px;
+      background:
+        linear-gradient(
+          180deg,
+          #17200f 0%,
+          #11150c 100%
+        );
+      padding: 16px 12px;
+      text-align: center;
+      box-shadow:
+        0 0 18px rgba(140, 255, 0, 0.08);
+    }
+
+    .bracket-champion-card::before {
+      content: "";
+      position: absolute;
+      left: -25px;
+      top: 50%;
+      width: 24px;
+      height: 1px;
+      background: #8cff00;
+    }
+
+    .champion-trophy {
+      font-size: 25px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .champion-label {
+      color: #9aaa7b;
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+
+    .champion-name {
+      color: #bfff66;
+      font-size: 17px;
+      font-weight: 900;
+      word-break: break-word;
+    }
+
     .bracket-empty {
       padding: 24px;
       text-align: center;
@@ -358,13 +455,14 @@
         padding: 12px;
       }
 
-      .bracket-column {
+      .bracket-column,
+      .bracket-champion {
         width: 175px;
         flex-basis: 175px;
       }
 
       .bracket-board {
-        gap: 18px;
+        gap: 20px;
       }
 
       .bracket-meta {
@@ -372,7 +470,6 @@
         text-align: right;
       }
     }
-
 
     .login-box {
       max-width: 420px;
@@ -626,10 +723,16 @@
       </div>
 
       <details class="raw-detail">
-        <summary class="muted" style="cursor:pointer;">
+        <summary
+          class="muted"
+          style="cursor:pointer;"
+        >
           查看原始賽事資料
         </summary>
-        <pre id="detailOutput">尚未選擇賽事</pre>
+
+        <pre id="detailOutput">
+尚未選擇賽事
+        </pre>
       </details>
 
     </section>
@@ -652,11 +755,13 @@
     message,
     type = ""
   ) {
-    element.textContent = message;
+
+    element.textContent =
+      message;
 
     element.className =
-      "status " +
-      type;
+      "status " + type;
+
   }
 
 
@@ -668,12 +773,14 @@
     url,
     options = {}
   ) {
+
     const response =
       await fetch(
         url,
         {
           credentials: "same-origin",
           ...options,
+
           headers: {
             "Content-Type":
               "application/json",
@@ -685,17 +792,23 @@
     let data = null;
 
     try {
+
       data =
         await response.json();
+
     } catch {
+
       data = {};
+
     }
 
     if (!response.ok) {
+
       throw new Error(
         data.error ||
         `HTTP ${response.status}`
       );
+
     }
 
     return data;
@@ -718,9 +831,13 @@
       if (
         data.authenticated
       ) {
+
         showApp();
+
       } else {
+
         showLogin();
+
       }
 
     } catch {
@@ -728,6 +845,7 @@
       showLogin();
 
     }
+
   }
 
 
@@ -740,6 +858,7 @@
     $("app")
       .classList
       .add("hidden");
+
   }
 
 
@@ -754,6 +873,7 @@
       .remove("hidden");
 
     loadTournaments();
+
   }
 
 
@@ -770,11 +890,13 @@
           $("password").value;
 
         if (!password) {
+
           showStatus(
             $("loginStatus"),
             "請輸入管理員密碼",
             "error"
           );
+
           return;
         }
 
@@ -817,6 +939,7 @@
 
 
   // Enter 登入
+
   $("password")
     .addEventListener(
       "keydown",
@@ -825,8 +948,10 @@
         if (
           event.key === "Enter"
         ) {
+
           $("loginButton")
             .click();
+
         }
 
       }
@@ -901,6 +1026,7 @@
           );
 
           return;
+
         }
 
         if (
@@ -915,8 +1041,8 @@
           );
 
           return;
-        }
 
+        }
 
         try {
 
@@ -927,7 +1053,6 @@
             $("createStatus"),
             "正在建立賽程..."
           );
-
 
           const data =
             await api(
@@ -945,7 +1070,6 @@
               }
             );
 
-
           showStatus(
             $("createStatus"),
             `賽事建立成功！
@@ -954,13 +1078,11 @@ Tournament ID: ${data.tournamentId}`,
             "success"
           );
 
-
           await loadTournaments();
 
           await loadTournamentDetail(
             data.tournamentId
           );
-
 
         } catch (error) {
 
@@ -980,10 +1102,6 @@ Tournament ID: ${data.tournamentId}`,
       }
     );
 
-
-  // ==========================================================
-  // 載入賽事列表
-  // ==========================================================
 
   // ==========================================================
   // 載入賽事列表
@@ -1010,8 +1128,8 @@ Tournament ID: ${data.tournamentId}`,
           '<div class="muted">目前沒有賽事</div>';
 
         return;
-      }
 
+      }
 
       container.innerHTML =
         tournaments
@@ -1030,7 +1148,6 @@ Tournament ID: ${data.tournamentId}`,
                   ? "已完成"
                   : "進行中";
 
-
               return `
                 <div
                   class="tournament-item"
@@ -1042,7 +1159,6 @@ Tournament ID: ${data.tournamentId}`,
                     )}
                   </strong>
 
-
                   <div class="muted">
 
                     ID：
@@ -1051,24 +1167,31 @@ Tournament ID: ${data.tournamentId}`,
                     )}
 
                    　
+
                     人數：
                     ${escapeHtml(
-                      String(tournament.size || "")
+                      String(
+                        tournament.size || ""
+                      )
                     )}
 
                    　
+
                     賽制：
-                    ${escapeHtml(format)}
+                    ${escapeHtml(
+                      format
+                    )}
 
                    　
+
                     狀態：
-                    ${escapeHtml(status)}
+                    ${escapeHtml(
+                      status
+                    )}
 
                   </div>
 
-
                   <br>
-
 
                   <div
                     class="button-row"
@@ -1078,22 +1201,28 @@ Tournament ID: ${data.tournamentId}`,
                       class="secondary"
                       onclick="
                         loadTournamentDetail(
-                          ${Number(tournament.id)}
+                          ${Number(
+                            tournament.id
+                          )}
                         )
                       "
                     >
                       查看賽程資料
                     </button>
 
-
                     <button
                       class="danger"
                       onclick="
                         deleteTournament(
-                          ${Number(tournament.id)},
+                          ${Number(
+                            tournament.id
+                          )},
                           '${escapeHtml(
                             tournament.name
-                          ).replace(/'/g, "\\'")}'
+                          ).replace(
+                            /'/g,
+                            "\\'"
+                          )}'
                         )
                       "
                     >
@@ -1102,13 +1231,12 @@ Tournament ID: ${data.tournamentId}`,
 
                   </div>
 
-
                 </div>
               `;
+
             }
           )
           .join("");
-
 
     } catch (error) {
 
@@ -1136,13 +1264,11 @@ Tournament ID: ${data.tournamentId}`,
         `刪除後無法復原。`
       );
 
-
     if (!confirmed) {
 
       return;
 
     }
-
 
     try {
 
@@ -1153,16 +1279,11 @@ Tournament ID: ${data.tournamentId}`,
         }
       );
 
-
-      // 如果目前正在查看被刪除的賽事，
-      // 清除右側／下方的詳細資料。
-
       const bracketOutput =
         $("bracketOutput");
 
       const detailOutput =
         $("detailOutput");
-
 
       if (bracketOutput) {
 
@@ -1174,7 +1295,6 @@ Tournament ID: ${data.tournamentId}`,
 
       }
 
-
       if (detailOutput) {
 
         detailOutput.textContent =
@@ -1182,16 +1302,11 @@ Tournament ID: ${data.tournamentId}`,
 
       }
 
-
-      // 重新載入賽事列表
-
       await loadTournaments();
-
 
       alert(
         `賽事「${tournamentName}」已刪除。`
       );
-
 
     } catch (error) {
 
@@ -1199,7 +1314,6 @@ Tournament ID: ${data.tournamentId}`,
         "刪除賽事失敗：",
         error
       );
-
 
       alert(
         error.message ||
@@ -1219,8 +1333,11 @@ Tournament ID: ${data.tournamentId}`,
     tournamentId
   ) {
 
-    const bracketOutput = $("bracketOutput");
-    const detailOutput = $("detailOutput");
+    const bracketOutput =
+      $("bracketOutput");
+
+    const detailOutput =
+      $("detailOutput");
 
     bracketOutput.innerHTML = `
       <div class="bracket-empty">
@@ -1248,7 +1365,9 @@ Tournament ID: ${data.tournamentId}`,
 
       bracketOutput.innerHTML = `
         <div class="status error">
-          ${escapeHtml(error.message)}
+          ${escapeHtml(
+            error.message
+          )}
         </div>
       `;
 
@@ -1256,6 +1375,7 @@ Tournament ID: ${data.tournamentId}`,
         error.message;
 
     }
+
   }
 
 
@@ -1265,23 +1385,31 @@ Tournament ID: ${data.tournamentId}`,
 
   function renderBracket(data) {
 
-    const container = $("bracketOutput");
-    const tournament = data.tournament || {};
-    const matches = Array.isArray(data.matches)
-      ? data.matches
-      : [];
+    const container =
+      $("bracketOutput");
+
+    const tournament =
+      data.tournament || {};
+
+    const matches =
+      Array.isArray(data.matches)
+        ? data.matches
+        : [];
 
     if (!matches.length) {
+
       container.innerHTML = `
         <div class="bracket-empty">
           這個賽事目前沒有賽程資料
         </div>
       `;
+
       return;
     }
 
     const isDouble =
-      tournament.format === "double_elimination";
+      tournament.format ===
+      "double_elimination";
 
     const activeMatches =
       matches.filter(
@@ -1289,30 +1417,70 @@ Tournament ID: ${data.tournamentId}`,
           match.status !== "void"
       );
 
-    const brackets = isDouble
-      ? ["winners", "losers", "grand_final"]
-      : ["winners"];
+    const brackets =
+      isDouble
+        ? [
+            "winners",
+            "losers",
+            "grand_final"
+          ]
+        : [
+            "winners"
+          ];
 
     const columns = [];
 
-    for (const bracket of brackets) {
+    for (
+      const bracket of brackets
+    ) {
 
       const bracketMatches =
         activeMatches.filter(
           (match) =>
-            match.bracket === bracket
+            match.bracket ===
+            bracket
         );
 
-      if (!bracketMatches.length) {
+      if (
+        !bracketMatches.length
+      ) {
+
         continue;
+
       }
 
       const maxRound =
         Math.max(
           ...bracketMatches.map(
             (match) =>
-              Number(match.round) || 1
+              Number(
+                match.round
+              ) || 1
           )
+        );
+
+      /*
+       * 以第一輪實際場次作為整個 bracket 的基準。
+       *
+       * 例如 15 人：
+       *
+       * 第1輪 = 8 場
+       * 第2輪 = 每場跨 2 格
+       * 第3輪 = 每場跨 4 格
+       * 第4輪 = 每場跨 8 格
+       *
+       * 因此每一輪都會自動落在前一輪兩場的正中央。
+       */
+
+      const firstRoundCount =
+        Math.max(
+          1,
+          bracketMatches.filter(
+            (match) =>
+              Number(
+                match.round
+              ) === 1
+          ).length
         );
 
       for (
@@ -1325,31 +1493,57 @@ Tournament ID: ${data.tournamentId}`,
           bracketMatches
             .filter(
               (match) =>
-                Number(match.round) === round
+                Number(
+                  match.round
+                ) === round
             )
             .sort(
               (a, b) =>
-                Number(a.position) -
-                Number(b.position)
+                Number(
+                  a.position
+                ) -
+                Number(
+                  b.position
+                )
             );
 
-        if (!roundMatches.length) {
+        if (
+          !roundMatches.length
+        ) {
+
           continue;
+
         }
 
         columns.push({
           bracket,
           round,
-          matches: roundMatches
+          matches:
+            roundMatches,
+          slotCount:
+            firstRoundCount
         });
+
       }
+
     }
 
+
     const bracketLabel = {
-      winners: isDouble ? "勝部" : "",
-      losers: "敗部",
-      grand_final: "總決賽"
+
+      winners:
+        isDouble
+          ? "勝部"
+          : "",
+
+      losers:
+        "敗部",
+
+      grand_final:
+        "總決賽"
+
     };
+
 
     const board =
       columns
@@ -1357,120 +1551,396 @@ Tournament ID: ${data.tournamentId}`,
           (column) => {
 
             const roundName =
-              column.bracket === "grand_final"
+              column.bracket ===
+              "grand_final"
+
                 ? "總決賽"
-                : column.bracket === "losers"
+
+                : column.bracket ===
+                  "losers"
+
                   ? `敗部 R${column.round}`
+
                   : `第 ${column.round} 輪`;
 
+
             const title =
-              bracketLabel[column.bracket]
-                ? `${bracketLabel[column.bracket]} · ${roundName}`
+              bracketLabel[
+                column.bracket
+              ]
+
+                ? `${
+                    bracketLabel[
+                      column.bracket
+                    ]
+                  } · ${roundName}`
+
                 : roundName;
+
 
             const matchesHtml =
               column.matches
                 .map(
-                  (match) =>
-                    renderMatchCard(
-                      match,
-                      tournament.id
-                    )
+                  (match) => {
+
+                    const position =
+                      Number(
+                        match.position
+                      ) || 1;
+
+                    const span =
+                      Math.pow(
+                        2,
+                        column.round - 1
+                      );
+
+                    const start =
+                      (position - 1) *
+                        span +
+                      1;
+
+                    return `
+                      <div
+                        class="match-slot"
+                        style="
+                          grid-row:
+                            ${start}
+                            / span
+                            ${span};
+                        "
+                      >
+
+                        ${renderMatchCard(
+                          match,
+                          tournament.id
+                        )}
+
+                      </div>
+                    `;
+
+                  }
                 )
                 .join("");
 
-            /*
-             * 每往後一輪，讓對戰卡片間距放大，
-             * 讓下一輪自然位於上一輪兩場比賽的中間。
-             */
-            const spacing =
-              Math.max(
-                0,
-                Math.pow(
-                  2,
-                  column.round - 1
-                ) - 1
-              ) * 48;
-
-            const firstOffset =
-              Math.max(
-                0,
-                Math.pow(
-                  2,
-                  column.round - 1
-                ) - 1
-              ) * 24;
 
             return `
-              <div class="bracket-column">
-                <div class="bracket-column-title">
-                  ${escapeHtml(title)}
+              <div
+                class="bracket-column"
+              >
+
+                <div
+                  class="bracket-column-title"
+                >
+                  ${escapeHtml(
+                    title
+                  )}
                 </div>
 
                 <div
                   class="bracket-matches"
                   style="
-                    padding-top:${firstOffset}px;
-                    gap:${spacing}px;
+                    --slot-count:
+                      ${column.slotCount};
                   "
                 >
+
                   ${matchesHtml}
+
                 </div>
+
               </div>
             `;
+
           }
         )
         .join("");
 
+
     const formatText =
-      tournament.format === "single_elimination"
+      tournament.format ===
+      "single_elimination"
+
         ? "單淘汰"
+
         : "雙敗";
 
+
     const statusText =
-      tournament.status === "completed"
+      tournament.status ===
+      "completed"
+
         ? "已完成"
+
         : "進行中";
 
+
+    /*
+     * ========================================================
+     * 找冠軍
+     *
+     * 第一優先：
+     * tournaments.champion_id
+     *
+     * 第二優先：
+     * 最後一場 winners match 的 winner_id
+     *
+     * 這樣即使 API 尚未附帶 participants，
+     * 也可以從決賽直接找到冠軍姓名。
+     * ========================================================
+     */
+
+    const championId =
+      tournament.champion_id ===
+        null ||
+      tournament.champion_id ===
+        undefined
+
+        ? null
+
+        : Number(
+            tournament.champion_id
+          );
+
+
+    let championName = "";
+
+
+    const participantList =
+      Array.isArray(
+        data.participants
+      )
+        ? data.participants
+        : [];
+
+
+    if (
+      championId !== null
+    ) {
+
+      const champion =
+        participantList.find(
+          (participant) =>
+            Number(
+              participant.id
+            ) === championId
+        );
+
+      if (champion) {
+
+        championName =
+          champion.name ||
+          champion.participant_name ||
+          "";
+
+      }
+
+    }
+
+
+    /*
+     * 如果 participants 沒有資料，
+     * 從最後一場比賽的 winner_id 找名字。
+     */
+
+    if (
+      !championName
+    ) {
+
+      const finalMatch =
+        activeMatches
+          .filter(
+            (match) =>
+              match.bracket ===
+                "winners" &&
+              !match.next_match_id
+          )
+          .sort(
+            (a, b) =>
+              Number(
+                b.round
+              ) -
+              Number(
+                a.round
+              )
+          )[0];
+
+
+      if (
+        finalMatch &&
+        finalMatch.winner_id
+      ) {
+
+        const winnerId =
+          Number(
+            finalMatch.winner_id
+          );
+
+
+        if (
+          winnerId ===
+          Number(
+            finalMatch.participant1_id
+          )
+        ) {
+
+          championName =
+            finalMatch
+              .participant1_name ||
+            "";
+
+        } else if (
+          winnerId ===
+          Number(
+            finalMatch.participant2_id
+          )
+        ) {
+
+          championName =
+            finalMatch
+              .participant2_name ||
+            "";
+
+        }
+
+      }
+
+    }
+
+
+    const isCompleted =
+      tournament.status ===
+        "completed" &&
+      Boolean(
+        championName
+      );
+
+
+    const championHtml =
+      isCompleted
+
+        ? `
+          <div
+            class="bracket-champion"
+          >
+
+            <div
+              class="
+                bracket-champion-title
+              "
+            >
+              冠軍
+            </div>
+
+            <div
+              class="
+                bracket-champion-card
+              "
+            >
+
+              <div
+                class="champion-trophy"
+              >
+                🏆
+              </div>
+
+              <div
+                class="champion-label"
+              >
+                本屆冠軍
+              </div>
+
+              <div
+                class="champion-name"
+              >
+                ${escapeHtml(
+                  championName
+                )}
+              </div>
+
+            </div>
+
+          </div>
+        `
+
+        : "";
+
+
     container.innerHTML = `
-      <div class="bracket-wrapper">
+      <div
+        class="bracket-wrapper"
+      >
 
-        <div class="bracket-header">
+        <div
+          class="bracket-header"
+        >
 
-          <div class="bracket-title">
+          <div
+            class="bracket-title"
+          >
             ${escapeHtml(
               tournament.name ||
               "未命名賽事"
             )}
           </div>
 
-          <div class="bracket-meta">
-            ${escapeHtml(formatText)}
+          <div
+            class="bracket-meta"
+          >
+
+            ${escapeHtml(
+              formatText
+            )}
+
             ・
-            ${escapeHtml(String(tournament.size || ""))}
+
+            ${escapeHtml(
+              String(
+                tournament.size || ""
+              )
+            )}
+
             人
+
             ・
-            ${escapeHtml(statusText)}
+
+            ${escapeHtml(
+              statusText
+            )}
+
           </div>
 
         </div>
 
-        <div class="bracket-board">
+
+        <div
+          class="bracket-board"
+        >
+
           ${board}
+
+          ${championHtml}
+
         </div>
 
       </div>
     `;
+
   }
 
 
-    function renderMatchCard(
+  // ==========================================================
+  // 比賽卡片
+  // ==========================================================
+
+  function renderMatchCard(
     match,
     tournamentId
   ) {
 
     const isBye =
-      Number(match.is_bye_match) === 1;
+      Number(
+        match.is_bye_match
+      ) === 1;
 
 
     const participant1 =
@@ -1486,40 +1956,57 @@ Tournament ID: ${data.tournamentId}`,
     const score1 =
       match.score1 === null ||
       match.score1 === undefined
+
         ? ""
+
         : match.score1;
 
 
     const score2 =
       match.score2 === null ||
       match.score2 === undefined
+
         ? ""
+
         : match.score2;
 
 
     const winnerId =
       match.winner_id === null ||
       match.winner_id === undefined
+
         ? null
-        : Number(match.winner_id);
+
+        : Number(
+            match.winner_id
+          );
 
 
     const p1Id =
       match.participant1_id === null ||
       match.participant1_id === undefined
+
         ? null
-        : Number(match.participant1_id);
+
+        : Number(
+            match.participant1_id
+          );
 
 
     const p2Id =
       match.participant2_id === null ||
       match.participant2_id === undefined
+
         ? null
-        : Number(match.participant2_id);
+
+        : Number(
+            match.participant2_id
+          );
 
 
     const status =
-      match.status || "pending";
+      match.status ||
+      "pending";
 
 
     let statusText =
@@ -1537,7 +2024,9 @@ Tournament ID: ${data.tournamentId}`,
       statusClass =
         "bye-text";
 
-    } else if (status === "ready") {
+    } else if (
+      status === "ready"
+    ) {
 
       statusText =
         "可進行";
@@ -1545,7 +2034,9 @@ Tournament ID: ${data.tournamentId}`,
       statusClass =
         "ready-text";
 
-    } else if (status === "completed") {
+    } else if (
+      status === "completed"
+    ) {
 
       statusText =
         "已完成";
@@ -1581,6 +2072,7 @@ Tournament ID: ${data.tournamentId}`,
         status === "completed"
           ? "completed"
           : ""
+
       ]
         .filter(Boolean)
         .join(" ");
@@ -1589,25 +2081,33 @@ Tournament ID: ${data.tournamentId}`,
     const p1Class =
       p1Id !== null &&
       winnerId === p1Id
+
         ? "player-name winner"
+
         : participant1
+
           ? "player-name"
+
           : "player-name empty";
 
 
     const p2Class =
       p2Id !== null &&
       winnerId === p2Id
+
         ? "player-name winner"
+
         : participant2
+
           ? "player-name"
+
           : "player-name empty";
 
 
     /*
-     * 只有「雙方都已經產生」、
-     * 而且不是 BYE、不是已完成的比賽，
-     * 才可以讓管理員點選勝者。
+     * 只有雙方都已產生，
+     * 且不是 BYE / 已完成，
+     * 才能點選勝者。
      */
 
     const canSelectWinner =
@@ -1619,41 +2119,63 @@ Tournament ID: ${data.tournamentId}`,
 
     const p1Action =
       canSelectWinner
+
         ? `
           onclick="
             selectWinner(
-              ${Number(tournamentId)},
-              ${Number(match.id)},
-              ${Number(p1Id)},
+              ${Number(
+                tournamentId
+              )},
+              ${Number(
+                match.id
+              )},
+              ${Number(
+                p1Id
+              )},
               '${escapeHtml(
                 participant1
-              ).replace(/'/g, "\\'")}'
+              ).replace(
+                /'/g,
+                "\\'"
+              )}'
             )
           "
           style="
             cursor:pointer;
           "
         `
+
         : "";
 
 
     const p2Action =
       canSelectWinner
+
         ? `
           onclick="
             selectWinner(
-              ${Number(tournamentId)},
-              ${Number(match.id)},
-              ${Number(p2Id)},
+              ${Number(
+                tournamentId
+              )},
+              ${Number(
+                match.id
+              )},
+              ${Number(
+                p2Id
+              )},
               '${escapeHtml(
                 participant2
-              ).replace(/'/g, "\\'")}'
+              ).replace(
+                /'/g,
+                "\\'"
+              )}'
             )
           "
           style="
             cursor:pointer;
           "
         `
+
         : "";
 
 
@@ -1661,20 +2183,28 @@ Tournament ID: ${data.tournamentId}`,
       <div
         class="${cardClass}"
         data-match-id="${escapeHtml(
-          String(match.id)
+          String(
+            match.id
+          )
         )}"
       >
 
-        <div class="match-label">
+        <div
+          class="match-label"
+        >
 
           #${escapeHtml(
-            String(match.id)
+            String(
+              match.id
+            )
           )}
 
           ・
 
           場次 ${escapeHtml(
-            String(match.position)
+            String(
+              match.position
+            )
           )}
 
         </div>
@@ -1685,7 +2215,9 @@ Tournament ID: ${data.tournamentId}`,
           ${p1Action}
         >
 
-          <span class="${p1Class}">
+          <span
+            class="${p1Class}"
+          >
 
             ${escapeHtml(
               participant1 ||
@@ -1695,10 +2227,14 @@ Tournament ID: ${data.tournamentId}`,
           </span>
 
 
-          <span class="player-score">
+          <span
+            class="player-score"
+          >
 
             ${escapeHtml(
-              String(score1)
+              String(
+                score1
+              )
             )}
 
           </span>
@@ -1711,7 +2247,9 @@ Tournament ID: ${data.tournamentId}`,
           ${p2Action}
         >
 
-          <span class="${p2Class}">
+          <span
+            class="${p2Class}"
+          >
 
             ${escapeHtml(
               participant2 ||
@@ -1725,10 +2263,14 @@ Tournament ID: ${data.tournamentId}`,
           </span>
 
 
-          <span class="player-score">
+          <span
+            class="player-score"
+          >
 
             ${escapeHtml(
-              String(score2)
+              String(
+                score2
+              )
             )}
 
           </span>
@@ -1737,7 +2279,10 @@ Tournament ID: ${data.tournamentId}`,
 
 
         <div
-          class="match-status ${statusClass}"
+          class="
+            match-status
+            ${statusClass}
+          "
         >
 
           ${escapeHtml(
@@ -1749,24 +2294,29 @@ Tournament ID: ${data.tournamentId}`,
 
         ${
           canSelectWinner
+
             ? `
               <div
                 style="
-                  padding:6px 9px 9px;
+                  padding:
+                    6px 9px 9px;
                   color:#8cff00;
                   font-size:11px;
                   text-align:center;
-                  border-top:1px solid #292929;
+                  border-top:
+                    1px solid #292929;
                 "
               >
                 點選上方選手即可晉級
               </div>
             `
+
             : ""
         }
 
       </div>
     `;
+
   }
 
 
@@ -1811,7 +2361,6 @@ Tournament ID: ${data.tournamentId}`,
       );
 
 
-      // 更新整個賽事畫面
       await loadTournamentDetail(
         tournamentId
       );
@@ -1833,6 +2382,7 @@ Tournament ID: ${data.tournamentId}`,
     }
 
   }
+
 
   // ==========================================================
   // HTML escape
