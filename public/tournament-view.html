@@ -2052,18 +2052,24 @@ columns
 
 const roundName =
 
-column.bracket ===
-"grand_final"
+  column.bracket ===
+  "grand_final"
 
-? "總決賽"
+  ? (
+      column.matches.some(
+        (match) =>
+          Number(match.is_reset_match) === 1
+      )
+        ? "重賽"
+        : "總決賽"
+    )
 
-: column.bracket ===
-"losers"
+  : column.bracket ===
+  "losers"
 
-? `敗部 R${column.round}`
+  ? `敗部 R${column.round}`
 
-: `第 ${column.round} 輪`;
-
+  : `第 ${column.round} 輪`;
 
 const title =
 
