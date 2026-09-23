@@ -2495,6 +2495,119 @@ async function requireAdmin(
   );
 }
 
+// ============================================================
+// 工作區管理驗證
+//
+// 支援兩種身份：
+//
+// 1. ADMIN_PASSWORD
+//    → 最高管理員
+//    → deviceId = null
+//
+// 2. device_session
+//    → 工作區管理者
+//    → 只能管理自己的 management_device_id
+// ============================================================
+
+async function requireWorkspaceAdmin(
+  request,
+  env
+) {
+  // ==========================================================
+  // 優先使用現有的 ADMIN_PASSWORD Session
+  // ==========================================================
+
+  const adminSession =
+    await getSession(
+      request,
+      env
+    );
+
+  if (adminSession) {
+    return {
+      type: "admin",
+      session: adminSession,
+      deviceId: null
+    };
+  }
+
+  // ==========================================================
+  // 沒有 ADMIN_PASSWORD Session
+  // → 嘗試使用 device_session
+  // ==========================================================
+
+  const deviceSession =
+    await getDeviceSession(
+      request,
+      env
+    );
+
+  if (!deviceSession) {
+    return null;
+  }
+
+  return {
+    type: "device",
+    session: deviceSession,
+    deviceId: Number(
+      deviceSession.device_id
+    )
+  };
+}
+
+// ============================================================
+// 延長工作區 Session
+//
+// ADMIN_PASSWORD Session
+// → 延長 sessions
+//
+// device_session
+// → 更新 management_devices.last_seen_at
+// ============================================================
+
+async function refreshWorkspaceSession(
+  auth,
+  env
+) {
+  if (!auth) {
+    return;
+  }
+
+  // ==========================================================
+  // 最高管理員
+  // ==========================================================
+
+  if (
+    auth.type === "admin"
+  ) {
+    await refreshSession(
+      auth.session.token,
+      env
+    );
+
+    return;
+  }
+
+  // ==========================================================
+  // 工作區裝置
+  // ==========================================================
+
+  if (
+    auth.type === "device"
+  ) {
+    await env.DB
+      .prepare(`
+        UPDATE management_devices
+        SET last_seen_at = ?
+        WHERE id = ?
+      `)
+      .bind(
+        new Date().toISOString(),
+        auth.deviceId
+      )
+      .run();
+  }
+}
 
 // ============================================================
 // 延長 Session
