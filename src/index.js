@@ -45,10 +45,19 @@ export default {
           "competition"
         );
 
+      const workspaceAuth =
+        await requireWorkspaceAdmin(
+          request,
+          env
+        );
+
       const ranking =
         await getRanking(
           env,
-          competitionId
+          competitionId,
+          workspaceAuth?.type === "device"
+            ? workspaceAuth.deviceId
+            : null
         );
 
       return jsonResponse({
@@ -246,15 +255,27 @@ export default {
       }
 
       const existing =
-        await env.DB
-          .prepare(`
-            SELECT id
-            FROM competitions
-            WHERE name = ?
-            LIMIT 1
-          `)
-          .bind(name)
-          .first();
+        session.type === "device"
+          ? await env.DB
+              .prepare(`
+                SELECT id
+                FROM competitions
+                WHERE name = ?
+                  AND management_device_id = ?
+                LIMIT 1
+              `)
+              .bind(name, session.deviceId)
+              .first()
+          : await env.DB
+              .prepare(`
+                SELECT id
+                FROM competitions
+                WHERE name = ?
+                  AND management_device_id IS NULL
+                LIMIT 1
+              `)
+              .bind(name)
+              .first();
 
       if (existing) {
         return jsonResponse(
@@ -267,15 +288,26 @@ export default {
       }
 
       const latest =
-        await env.DB
-          .prepare(`
-            SELECT
-              sort_order
-            FROM competitions
-            ORDER BY sort_order DESC
-            LIMIT 1
-          `)
-          .first();
+        session.type === "device"
+          ? await env.DB
+              .prepare(`
+                SELECT sort_order
+                FROM competitions
+                WHERE management_device_id = ?
+                ORDER BY sort_order DESC
+                LIMIT 1
+              `)
+              .bind(session.deviceId)
+              .first()
+          : await env.DB
+              .prepare(`
+                SELECT sort_order
+                FROM competitions
+                WHERE management_device_id IS NULL
+                ORDER BY sort_order DESC
+                LIMIT 1
+              `)
+              .first();
 
       const sortOrder =
         latest
@@ -321,12 +353,22 @@ export default {
        * 後續新增的競賽一律從 0 開始。
        */
       const competitionCount =
-        await env.DB
-          .prepare(`
-            SELECT COUNT(*) AS count
-            FROM competitions
-          `)
-          .first();
+        session.type === "device"
+          ? await env.DB
+              .prepare(`
+                SELECT COUNT(*) AS count
+                FROM competitions
+                WHERE management_device_id = ?
+              `)
+              .bind(session.deviceId)
+              .first()
+          : await env.DB
+              .prepare(`
+                SELECT COUNT(*) AS count
+                FROM competitions
+                WHERE management_device_id IS NULL
+              `)
+              .first();
 
       if (
         Number(
@@ -480,19 +522,36 @@ export default {
       }
 
       const duplicate =
-        await env.DB
-          .prepare(`
-            SELECT id
-            FROM competitions
-            WHERE name = ?
-            AND id != ?
-            LIMIT 1
-          `)
-          .bind(
-            name,
-            competitionId
-          )
-          .first();
+        session.type === "device"
+          ? await env.DB
+              .prepare(`
+                SELECT id
+                FROM competitions
+                WHERE name = ?
+                  AND id != ?
+                  AND management_device_id = ?
+                LIMIT 1
+              `)
+              .bind(
+                name,
+                competitionId,
+                session.deviceId
+              )
+              .first()
+          : await env.DB
+              .prepare(`
+                SELECT id
+                FROM competitions
+                WHERE name = ?
+                  AND id != ?
+                  AND management_device_id IS NULL
+                LIMIT 1
+              `)
+              .bind(
+                name,
+                competitionId
+              )
+              .first();
 
       if (duplicate) {
         return jsonResponse(
@@ -978,15 +1037,27 @@ export default {
       }
 
       const existing =
-        await env.DB
-          .prepare(`
-            SELECT id
-            FROM participants
-            WHERE name = ?
-            LIMIT 1
-          `)
-          .bind(name)
-          .first();
+        session.type === "device"
+          ? await env.DB
+              .prepare(`
+                SELECT id
+                FROM participants
+                WHERE name = ?
+                  AND management_device_id = ?
+                LIMIT 1
+              `)
+              .bind(name, session.deviceId)
+              .first()
+          : await env.DB
+              .prepare(`
+                SELECT id
+                FROM participants
+                WHERE name = ?
+                  AND management_device_id IS NULL
+                LIMIT 1
+              `)
+              .bind(name)
+              .first();
 
       if (existing) {
         return jsonResponse(
@@ -1182,19 +1253,36 @@ export default {
       }
 
       const duplicate =
-        await env.DB
-          .prepare(`
-            SELECT id
-            FROM participants
-            WHERE name = ?
-            AND id != ?
-            LIMIT 1
-          `)
-          .bind(
-            name,
-            participantId
-          )
-          .first();
+        session.type === "device"
+          ? await env.DB
+              .prepare(`
+                SELECT id
+                FROM participants
+                WHERE name = ?
+                  AND id != ?
+                  AND management_device_id = ?
+                LIMIT 1
+              `)
+              .bind(
+                name,
+                participantId,
+                session.deviceId
+              )
+              .first()
+          : await env.DB
+              .prepare(`
+                SELECT id
+                FROM participants
+                WHERE name = ?
+                  AND id != ?
+                  AND management_device_id IS NULL
+                LIMIT 1
+              `)
+              .bind(
+                name,
+                participantId
+              )
+              .first();
 
       if (duplicate) {
         return jsonResponse(
@@ -1981,7 +2069,8 @@ async function getCompetitions(
 
 async function getRanking(
   env,
-  competitionId
+  competitionId,
+  managementDeviceId = null
 ) {
   let participants = [];
   let updatedAt = null;
@@ -1993,16 +2082,29 @@ async function getRanking(
     )
   ) {
     const competition =
-      await env.DB
-        .prepare(`
-          SELECT id
-          FROM competitions
-          WHERE id = ?
-        `)
-        .bind(
-          Number(competitionId)
-        )
-        .first();
+      managementDeviceId !== null
+        ? await env.DB
+            .prepare(`
+              SELECT id
+              FROM competitions
+              WHERE id = ?
+                AND management_device_id = ?
+            `)
+            .bind(
+              Number(competitionId),
+              managementDeviceId
+            )
+            .first()
+        : await env.DB
+            .prepare(`
+              SELECT id
+              FROM competitions
+              WHERE id = ?
+            `)
+            .bind(
+              Number(competitionId)
+            )
+            .first();
 
     if (!competition) {
       return {
@@ -2032,12 +2134,18 @@ async function getRanking(
               participants.id
             AND competition_scores.competition_id =
               ?
+          WHERE (
+            ? IS NULL
+            OR participants.management_device_id = ?
+          )
           ORDER BY
             score DESC,
             participants.id ASC
         `)
         .bind(
-          Number(competitionId)
+          Number(competitionId),
+          managementDeviceId,
+          managementDeviceId
         )
         .all();
 
@@ -2054,7 +2162,10 @@ async function getRanking(
      */
 
     const competitions =
-      await getCompetitions(env);
+      await getCompetitions(
+        env,
+        managementDeviceId
+      );
 
     if (competitions.length) {
       const { results } =
@@ -2080,6 +2191,10 @@ async function getRanking(
             LEFT JOIN competition_scores
               ON competition_scores.participant_id =
                 participants.id
+            WHERE (
+              ? IS NULL
+              OR participants.management_device_id = ?
+            )
             GROUP BY
               participants.id,
               participants.name,
@@ -2088,6 +2203,10 @@ async function getRanking(
               score DESC,
               participants.id ASC
           `)
+          .bind(
+            managementDeviceId,
+            managementDeviceId
+          )
           .all();
 
       participants =
@@ -2095,7 +2214,10 @@ async function getRanking(
 
     } else {
       participants =
-        await getParticipants(env);
+        await getParticipants(
+          env,
+          managementDeviceId
+        );
     }
   }
 
