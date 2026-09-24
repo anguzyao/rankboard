@@ -10,7 +10,14 @@ export async function handleTournamentRoutes(
   const path = url.pathname;
 
   if (path === "/api/tournaments" && request.method === "GET") {
-    const rows = await env.DB.prepare(`
+    const session = await requireAdmin(request, env);
+
+    const where =
+      session?.type === "device"
+        ? "WHERE t.management_device_id = ?"
+        : "";
+
+    const statement = env.DB.prepare(`
       SELECT
         t.id,
         t.name,
@@ -20,12 +27,19 @@ export async function handleTournamentRoutes(
         t.champion_id,
         t.created_at,
         t.updated_at,
+        t.management_device_id,
         c.name AS champion_name
       FROM tournaments t
       LEFT JOIN tournament_participants c
         ON c.id = t.champion_id
+      ${where}
       ORDER BY t.created_at DESC
-    `).all();
+    `);
+
+    const rows =
+      session?.type === "device"
+        ? await statement.bind(session.deviceId).all()
+        : await statement.all();
 
     return jsonResponse({
       tournaments: rows.results || []
@@ -136,13 +150,15 @@ export async function handleTournamentRoutes(
           size,
           status,
           created_at,
-          updated_at
+          updated_at,
+          management_device_id
         )
         VALUES (
           ?,
           ?,
           ?,
           'in_progress',
+          ?,
           ?,
           ?
         )
@@ -151,7 +167,10 @@ export async function handleTournamentRoutes(
         format,
         names.length,
         now,
-        now
+        now,
+        session.type === "device"
+          ? session.deviceId
+          : null
       ).run();
 
     const tournamentId =
@@ -408,7 +427,8 @@ export async function handleTournamentRoutes(
         SELECT
           id,
           format,
-          status
+          status,
+          management_device_id
         FROM tournaments
         WHERE id = ?
       `).bind(
@@ -422,6 +442,19 @@ export async function handleTournamentRoutes(
             "找不到這個賽事"
         },
         404
+      );
+    }
+
+    if (
+      session.type === "device" &&
+      Number(tournament.management_device_id) !==
+        Number(session.deviceId)
+    ) {
+      return jsonResponse(
+        {
+          error: "你沒有管理這個賽事的權限"
+        },
+        403
       );
     }
 
@@ -619,6 +652,31 @@ export async function handleTournamentRoutes(
         detailMatch[1]
       );
 
+    const tournament =
+      await env.DB.prepare(`
+        SELECT id, management_device_id
+        FROM tournaments
+        WHERE id = ?
+      `).bind(tournamentId).first();
+
+    if (!tournament) {
+      return jsonResponse(
+        { error: "找不到這個賽事" },
+        404
+      );
+    }
+
+    if (
+      session.type === "device" &&
+      Number(tournament.management_device_id) !==
+        Number(session.deviceId)
+    ) {
+      return jsonResponse(
+        { error: "你沒有管理這個賽事的權限" },
+        403
+      );
+    }
+
     await env.DB.prepare(`
       DELETE FROM tournaments
       WHERE id = ?
@@ -693,6 +751,31 @@ export async function handleTournamentRoutes(
       body.score2 === null
         ? null
         : Number(body.score2);
+
+    const tournament =
+      await env.DB.prepare(`
+        SELECT id, management_device_id, status
+        FROM tournaments
+        WHERE id = ?
+      `).bind(tournamentId).first();
+
+    if (!tournament) {
+      return jsonResponse(
+        { error: "找不到這個賽事" },
+        404
+      );
+    }
+
+    if (
+      session.type === "device" &&
+      Number(tournament.management_device_id) !==
+        Number(session.deviceId)
+    ) {
+      return jsonResponse(
+        { error: "你沒有管理這個賽事的權限" },
+        403
+      );
+    }
 
     const match =
       await env.DB.prepare(`
@@ -1687,6 +1770,7 @@ async function getTournamentDetail(
         t.champion_id,
         t.created_at,
         t.updated_at,
+        t.management_device_id,
         c.name AS champion_name
       FROM tournaments t
       LEFT JOIN tournament_participants c
